@@ -1,8 +1,9 @@
 import type { ReactNode } from "react"
+import Image from "next/image"
 import type { AuthSession } from "@/lib/auth/session"
 import { Sidebar } from "@/components/layout/sidebar"
 import { LogoutButton } from "@/components/auth/logout-button"
-import { Building2, UserRound } from "lucide-react"
+import { UserRound } from "lucide-react"
 
 export function AppShell({
   session,
@@ -20,8 +21,14 @@ export function AppShell({
       <header className="sticky top-0 z-30 border-b border-border/80 bg-card/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:px-6 sm:py-4 lg:px-10 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-border bg-background p-2 text-primary">
-              <Building2 className="size-5" />
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border bg-white p-1.5 shadow-sm">
+              <Image
+                src="/images/logo.png"
+                alt="Prime Trade logo"
+                width={40}
+                height={40}
+                className="h-full w-full object-contain"
+              />
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">

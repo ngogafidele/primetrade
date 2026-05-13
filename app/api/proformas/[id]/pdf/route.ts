@@ -46,7 +46,7 @@ export async function GET(
           lineTotal: item.lineTotal,
         })),
       },
-      { name: "B Ikaze Hardware", address: "Kigali, Gisozi" }
+      { name: "Prime Trade Company Ltd", address: "Kigali" }
     )
 
     return new NextResponse(new Uint8Array(pdf), {

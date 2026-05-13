@@ -64,7 +64,7 @@ export async function GET(
         totalAmount: invoice.totalAmount,
         items,
       },
-      { name: "B Ikaze Hardware", address: "Kigali, Gisozi" }
+      { name: "Prime Trade Company Ltd", address: "Kigali" }
     )
 
     return new NextResponse(new Uint8Array(pdf), {

@@ -188,7 +188,7 @@ export function ReportPrintButton({
             body {
               margin: 0;
               padding: 28px;
-              color: #17201b;
+              color: #172554;
               font-family: Arial, sans-serif;
               background: #ffffff;
             }
@@ -197,7 +197,7 @@ export function ReportPrintButton({
               grid-template-columns: 1fr auto;
               gap: 24px;
               align-items: start;
-              border-bottom: 3px solid #1f8a5b;
+              border-bottom: 3px solid #1d4ed8;
               padding-bottom: 18px;
               margin-bottom: 18px;
             }
@@ -210,16 +210,16 @@ export function ReportPrintButton({
             h2 {
               margin: 0 0 10px;
               font-size: 15px;
-              color: #173c2b;
+              color: #1e3a8a;
             }
             p {
               margin: 0 0 4px;
-              color: #53645b;
+              color: #52627a;
               font-size: 12px;
             }
             .eyebrow {
               margin-bottom: 5px;
-              color: #1f8a5b;
+              color: #1d4ed8;
               font-size: 10px;
               font-weight: 700;
               letter-spacing: 0.16em;
@@ -227,14 +227,14 @@ export function ReportPrintButton({
             }
             .summary {
               min-width: 240px;
-              border: 1px solid #c8ded2;
+              border: 1px solid #bfdbfe;
               padding: 12px;
-              background: #fbfdfc;
+              background: #f8fbff;
               text-align: right;
               white-space: nowrap;
             }
             .summary strong {
-              color: #173c2b;
+              color: #1e3a8a;
             }
             .metrics {
               display: grid;
@@ -244,22 +244,22 @@ export function ReportPrintButton({
             }
             .metric {
               min-height: 70px;
-              border: 1px solid #d8e3dc;
-              border-left: 4px solid #1f8a5b;
+              border: 1px solid #bfdbfe;
+              border-left: 4px solid #1d4ed8;
               padding: 10px;
-              background: #fbfdfc;
+              background: #f8fbff;
             }
             .metric.warning {
-              border-left-color: #c27803;
-              background: #fffaf0;
+              border-left-color: #f59e0b;
+              background: #fffbeb;
             }
             .metric.danger {
-              border-left-color: #b42318;
-              background: #fff5f5;
+              border-left-color: #dc2626;
+              background: #fef2f2;
             }
             .metric span {
               display: block;
-              color: #53645b;
+              color: #52627a;
               font-size: 9px;
               font-weight: 700;
               letter-spacing: 0.08em;
@@ -291,25 +291,25 @@ export function ReportPrintButton({
               font-size: 11px;
             }
             th {
-              background: #e9f6ef;
-              color: #173c2b;
+              background: #dbeafe;
+              color: #1e3a8a;
               text-align: left;
-              border: 1px solid #c8ded2;
+              border: 1px solid #bfdbfe;
               padding: 8px 7px;
             }
             td {
-              border: 1px solid #d8e3dc;
+              border: 1px solid #bfdbfe;
               padding: 7px;
               vertical-align: top;
             }
             td span {
               display: block;
               margin-top: 3px;
-              color: #66746c;
+              color: #64748b;
               font-size: 11px;
             }
             tr:nth-child(even) td {
-              background: #fbfdfc;
+              background: #f8fbff;
             }
             thead {
               display: table-header-group;
@@ -320,9 +320,9 @@ export function ReportPrintButton({
             }
             .footer {
               margin-top: 20px;
-              border-top: 1px solid #d8e3dc;
+              border-top: 1px solid #bfdbfe;
               padding-top: 10px;
-              color: #66746c;
+              color: #64748b;
               font-size: 10px;
             }
             @page {

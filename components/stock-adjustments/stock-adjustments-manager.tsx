@@ -195,7 +195,7 @@ export function StockAdjustmentsManager({
                     className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
                       isIncrease
                         ? "bg-emerald-100 text-emerald-700"
-                        : "bg-amber-100 text-amber-700"
+                        : "bg-yellow-100 text-yellow-800"
                     }`}
                   >
                     {isIncrease ? (

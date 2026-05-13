@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { KeyRound, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -78,17 +79,29 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_15%_20%,_#d5f5e3_0,_transparent_45%),radial-gradient(circle_at_85%_10%,_#fef3c7_0,_transparent_40%),linear-gradient(to_bottom,_#f8fafc,_#f3f4f6)]">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_14%_20%,_#dbeafe_0,_transparent_44%),radial-gradient(circle_at_86%_12%,_#fee2e2_0,_transparent_38%),radial-gradient(circle_at_55%_92%,_#fef3c7_0,_transparent_34%),linear-gradient(to_bottom,_#f8fbff,_#eef4ff)]">
       <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-14">
-        <div className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            Prime Trade Company  Ltd Inventory
-          </p>
-          <h1 className="text-3xl font-semibold sm:text-4xl">Sign in to Operations</h1>
-          <p className="max-w-xl text-sm text-muted-foreground">
-            Manage products, sales, and inventory from a single operations hub.
-            Admin setup is required only once.
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex size-20 shrink-0 items-center justify-center rounded-2xl border border-border bg-white p-2 shadow-sm">
+            <Image
+              src="/images/logo.png"
+              alt="Prime Trade logo"
+              width={72}
+              height={72}
+              className="h-full w-full object-contain"
+              priority
+            />
+          </div>
+          <div className="space-y-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Prime Trade Company Ltd Inventory
+            </p>
+            <h1 className="text-3xl font-semibold sm:text-4xl">Sign in to Operations</h1>
+            <p className="max-w-xl text-sm text-muted-foreground">
+              Manage products, sales, and inventory from a single operations hub.
+              Admin setup is required only once.
+            </p>
+          </div>
         </div>
 
         {message ? (

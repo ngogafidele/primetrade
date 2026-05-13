@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_15%_20%,_#d5f5e3_0,_transparent_45%),radial-gradient(circle_at_85%_10%,_#fef3c7_0,_transparent_40%),linear-gradient(to_bottom,_#f8fafc,_#f3f4f6)]">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_14%_20%,_#dbeafe_0,_transparent_44%),radial-gradient(circle_at_86%_12%,_#fee2e2_0,_transparent_38%),radial-gradient(circle_at_55%_92%,_#fef3c7_0,_transparent_34%),linear-gradient(to_bottom,_#f8fbff,_#eef4ff)]">
       <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-14">
         <div className="space-y-3">
           <div className="h-3 w-44 animate-pulse rounded bg-muted" />
