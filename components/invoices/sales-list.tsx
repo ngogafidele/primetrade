@@ -27,7 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import type { StoreKey } from "@/lib/auth/session"
 import { formatCurrency } from "@/lib/utils/format"
 import { formatInKigali } from "@/lib/utils/time"
 
@@ -91,14 +90,12 @@ function StatusBadge({ status }: { status: InvoiceStatus }) {
 }
 
 export function SalesInvoicesList({
-  storeId,
   sales,
   canCreateInvoices,
   canManageInvoices,
   canDeleteInvoices,
   newInvoiceSignal,
 }: {
-  storeId: StoreKey
   sales: SaleInvoiceSaleOption[]
   canCreateInvoices: boolean
   canManageInvoices: boolean
@@ -117,7 +114,7 @@ export function SalesInvoicesList({
 
   useEffect(() => {
     async function loadInvoices() {
-      const response = await fetch(`/api/sales-invoices?store=${storeId}`)
+      const response = await fetch("/api/sales-invoices")
       const body = await response.json()
       if (response.ok && body?.success) {
         setInvoices(
@@ -131,7 +128,7 @@ export function SalesInvoicesList({
     }
 
     loadInvoices().catch(() => setError("Failed to load sales invoices."))
-  }, [storeId])
+  }, [])
 
   useEffect(() => {
     if (
@@ -208,8 +205,8 @@ export function SalesInvoicesList({
       }
       const response = await fetch(
         activeInvoiceId
-          ? `/api/sales-invoices/${activeInvoiceId}?store=${storeId}`
-          : `/api/sales-invoices?store=${storeId}`,
+          ? `/api/sales-invoices/${activeInvoiceId}`
+          : "/api/sales-invoices",
         {
           method: activeInvoiceId ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -253,7 +250,7 @@ export function SalesInvoicesList({
 
     try {
       const response = await fetch(
-        `/api/sales-invoices/${invoice._id}/pdf?store=${storeId}`
+        `/api/sales-invoices/${invoice._id}/pdf`
       )
       if (!response.ok) {
         const body = await response.json().catch(() => null)
@@ -285,7 +282,7 @@ export function SalesInvoicesList({
 
     try {
       const response = await fetch(
-        `/api/sales-invoices/${invoice._id}?store=${storeId}`,
+        `/api/sales-invoices/${invoice._id}`,
         { method: "DELETE" }
       )
       const body = await response.json().catch(() => null)

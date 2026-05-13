@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { CreateProductSchema } from "@/lib/db/validators/product"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 import { ZodError } from "zod"
@@ -12,13 +11,13 @@ function getSkuBase(name: string) {
   return (normalized.slice(0, 6) || "PRD").padEnd(3, "X")
 }
 
-async function generateProductSku(store: string, name: string) {
+async function generateProductSku(name: string) {
   const base = getSkuBase(name)
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const suffix = Math.random().toString(36).slice(2, 6).toUpperCase()
     const sku = `${base}-${suffix}`
-    const existing = await Product.exists({ store, sku })
+    const existing = await Product.exists({ sku })
     if (!existing) return sku
   }
 
@@ -35,16 +34,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     await connectToDatabase()
-    const products = await Product.find({ store })
+    const products = await Product.find()
 
     return NextResponse.json({ success: true, data: products })
   } catch (error) {
@@ -65,14 +56,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Invalid store" },
-        { status: 400 }
-      )
-    }
-
     const payload = CreateProductSchema.parse(await request.json())
     const { categoryId: _categoryId, ...productInput } = payload
 
@@ -80,12 +63,10 @@ export async function POST(request: NextRequest) {
 
     const product = await Product.create({
       ...productInput,
-      sku: await generateProductSku(store, payload.name),
-      store,
+      sku: await generateProductSku(payload.name),
     })
 
     await syncLowStockAlert({
-      store,
       productId: product._id.toString(),
       name: product.name,
       sku: product.sku,

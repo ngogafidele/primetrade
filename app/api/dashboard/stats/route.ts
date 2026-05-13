@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
 import { Sale } from "@/lib/db/models/Sale"
@@ -62,16 +61,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 })
-    }
-
     await connectToDatabase()
 
     const today = getTodayRange()
     const todayFilter = {
-      store,
       createdAt: { $gte: today.start, $lt: today.end },
     }
 
@@ -83,24 +76,23 @@ export async function GET(request: NextRequest) {
       invoiceCount,
       unpaidCount,
     ] = await Promise.all([
-      Product.countDocuments({ store }),
+      Product.countDocuments(),
       Product.countDocuments({
-        store,
         $expr: { $lte: ["$quantity", { $ifNull: ["$lowStockThreshold", 0] }] },
       }),
-      Sale.countDocuments({ store }),
+      Sale.countDocuments(),
       Sale.countDocuments(todayFilter),
-      Invoice.countDocuments({ store }),
-      Invoice.countDocuments({ store, status: "unpaid" }),
+      Invoice.countDocuments(),
+      Invoice.countDocuments({ status: "unpaid" }),
     ])
 
     const sales = await Sale.aggregate<DashboardMoneyTotal>([
-      { $match: { store } },
+      { $match: {} },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ])
 
     const stockValue = await Product.aggregate<DashboardMoneyTotal>([
-      { $match: { store } },
+      { $match: {} },
       {
         $group: {
           _id: null,
@@ -117,7 +109,7 @@ export async function GET(request: NextRequest) {
     ])
 
     const unpaidTotals = await Invoice.aggregate<DashboardMoneyTotal>([
-      { $match: { store, status: "unpaid" } },
+      { $match: { status: "unpaid" } },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ])
 
@@ -150,7 +142,6 @@ export async function GET(request: NextRequest) {
     ])
 
     const lowStockProducts = await Product.find({
-      store,
       $expr: { $lte: ["$quantity", { $ifNull: ["$lowStockThreshold", 0] }] },
     })
       .select("name sku quantity unit lowStockThreshold")
@@ -158,14 +149,14 @@ export async function GET(request: NextRequest) {
       .limit(8)
       .lean<DashboardLowStockProduct[]>()
 
-    const recentSales = await Sale.find({ store })
+    const recentSales = await Sale.find()
       .select("totalAmount items createdAt")
       .sort({ createdAt: -1 })
       .limit(6)
       .lean<DashboardRecentSale[]>()
 
     const topMoving = await Sale.aggregate<DashboardTopMovingProduct>([
-      { $match: { store } },
+      { $match: {} },
       { $unwind: "$items" },
       {
         $group: {

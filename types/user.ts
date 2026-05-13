@@ -5,6 +5,5 @@ export type User = {
   name: string
   email: string
   role: UserRole
-  stores: Array<"store1" | "store2">
   isActive: boolean
 }

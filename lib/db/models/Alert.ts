@@ -2,11 +2,6 @@ import mongoose, { Schema } from "mongoose"
 
 const AlertSchema = new Schema(
   {
-    store: {
-      type: String,
-      enum: ["store1", "store2"],
-      required: true,
-    },
     type: {
       type: String,
       enum: ["low-stock", "custom"],
@@ -25,8 +20,7 @@ const AlertSchema = new Schema(
   { timestamps: true }
 )
 
-AlertSchema.index({ store: 1 })
-AlertSchema.index({ store: 1, productId: 1 })
+AlertSchema.index({ productId: 1 })
 
 export type AlertDocument = mongoose.InferSchemaType<typeof AlertSchema>
 

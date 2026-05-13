@@ -22,10 +22,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-type DashboardStatsProps = {
-  store: "store1" | "store2"
-}
-
 type StatsResponse = {
   productCount: number
   lowStockCount: number
@@ -59,14 +55,14 @@ type StatsResponse = {
   }>
 }
 
-export function DashboardStats({ store }: DashboardStatsProps) {
+export function DashboardStats() {
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchStats = async () => {
       setLoading(true)
-      const response = await fetch(`/api/dashboard/stats?store=${store}`)
+      const response = await fetch("/api/dashboard/stats")
       const data = await response.json()
       if (data?.success) {
         setStats(data.data)
@@ -75,7 +71,7 @@ export function DashboardStats({ store }: DashboardStatsProps) {
     }
 
     fetchStats()
-  }, [store])
+  }, [])
 
   if (loading) {
     return <DashboardSkeleton />

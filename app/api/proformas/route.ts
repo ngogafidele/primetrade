@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { Proforma } from "@/lib/db/models/Proforma"
 import { Sale } from "@/lib/db/models/Sale"
 import {
@@ -32,18 +31,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const query = ProformaListQuerySchema.parse(
       Object.fromEntries(request.nextUrl.searchParams.entries())
     )
-    const filter: Record<string, unknown> = { storeId: store }
+    const filter: Record<string, unknown> = {}
 
     if (query.search) {
       const search = new RegExp(query.search, "i")
@@ -100,19 +91,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const payload = CreateProformaSchema.parse(await request.json())
     await connectToDatabase()
 
     const sale = payload.saleId
-      ? await Sale.findOne({ _id: payload.saleId, store })
+      ? await Sale.findById(payload.saleId)
       : null
 
     if (payload.saleId && !sale) {
@@ -148,9 +131,8 @@ export async function POST(request: NextRequest) {
     for (let attempt = 0; attempt < MAX_PROFORMA_NUMBER_ATTEMPTS; attempt += 1) {
       try {
         proforma = await Proforma.create({
-          storeId: store,
           saleId: payload.saleId,
-          proformaNumber: await generateProformaNumber(store),
+          proformaNumber: await generateProformaNumber(),
           customerName: payload.customerName,
           customerEmail: payload.customerEmail ?? "",
           customerPhone: payload.customerPhone ?? "",

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { UpdateInvoiceSchema } from "@/lib/db/validators/invoice"
 
 export async function GET(
@@ -18,18 +17,10 @@ export async function GET(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
 
     await connectToDatabase()
-    const invoice = await Invoice.findOne({ _id: id, store })
+    const invoice = await Invoice.findById(id)
 
     if (!invoice) {
       return NextResponse.json(
@@ -67,20 +58,12 @@ export async function PUT(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
     const payload = UpdateInvoiceSchema.parse(await request.json())
 
     await connectToDatabase()
     const invoice = await Invoice.findOneAndUpdate(
-      { _id: id, store },
+      { _id: id },
       {
         ...payload,
         dueDate: payload.dueDate ? new Date(payload.dueDate) : undefined,
@@ -117,18 +100,10 @@ export async function DELETE(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
 
     await connectToDatabase()
-    const invoice = await Invoice.findOneAndDelete({ _id: id, store })
+    const invoice = await Invoice.findOneAndDelete({ _id: id })
 
     if (!invoice) {
       return NextResponse.json(

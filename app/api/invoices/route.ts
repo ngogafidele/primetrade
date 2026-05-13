@@ -3,7 +3,6 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Sale } from "@/lib/db/models/Sale"
 import { requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { CreateInvoiceSchema } from "@/lib/db/validators/invoice"
 import { generateInvoiceNumber } from "@/lib/utils/number-generator"
 
@@ -28,16 +27,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     await connectToDatabase()
-    const invoices = await Invoice.find({ store }).sort({ issuedAt: -1 })
+    const invoices = await Invoice.find().sort({ issuedAt: -1 })
 
     return NextResponse.json({ success: true, data: invoices })
   } catch (error) {
@@ -58,19 +49,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const payload = CreateInvoiceSchema.parse(await request.json())
 
     await connectToDatabase()
 
-    const sale = await Sale.findOne({ _id: payload.saleId, store })
+    const sale = await Sale.findById(payload.saleId)
     if (!sale) {
       return NextResponse.json(
         { success: false, error: "Sale not found" },
@@ -78,7 +61,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const existingInvoice = await Invoice.findOne({ saleId: sale._id, store })
+    const existingInvoice = await Invoice.findOne({ saleId: sale._id })
     if (existingInvoice) {
       return NextResponse.json(
         { success: false, error: "Invoice already exists" },
@@ -90,10 +73,9 @@ export async function POST(request: NextRequest) {
     for (let attempt = 0; attempt < MAX_INVOICE_NUMBER_ATTEMPTS; attempt += 1) {
       try {
         invoice = await Invoice.create({
-          store,
           saleId: sale._id,
           sourceType: "sale",
-          invoiceNumber: await generateInvoiceNumber(store),
+          invoiceNumber: await generateInvoiceNumber(),
           customerName: payload.customerName,
           customerEmail: payload.customerEmail ?? "",
           customerPhone: payload.customerPhone ?? "",
@@ -118,7 +100,6 @@ export async function POST(request: NextRequest) {
 
         const duplicateInvoice = await Invoice.findOne({
           saleId: sale._id,
-          store,
         })
         if (duplicateInvoice) {
           return NextResponse.json(

@@ -2,9 +2,6 @@ import jwt from "jsonwebtoken"
 import type { NextRequest } from "next/server"
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies"
 
-export const STORE_KEYS = ["store1", "store2"] as const
-export type StoreKey = (typeof STORE_KEYS)[number]
-
 export const AUTH_COOKIE = "auth"
 export const ADMIN_IDLE_TIMEOUT_SECONDS = 10 * 60
 export const STAFF_IDLE_TIMEOUT_SECONDS = 6 * 60 * 60
@@ -20,8 +17,6 @@ export interface AuthSession {
   email: string
   isAdmin: boolean
   role: "admin" | "manager" | "staff"
-  stores: StoreKey[]
-  currentStore?: StoreKey
   loginLogId?: string
   lastActivityAt: number
 }
@@ -33,8 +28,6 @@ export function createToken(session: AuthSession): string {
     email: session.email,
     isAdmin: session.isAdmin,
     role: session.role,
-    stores: session.stores,
-    currentStore: session.currentStore,
     loginLogId: session.loginLogId,
     lastActivityAt: session.lastActivityAt ?? Date.now(),
   }
@@ -104,38 +97,3 @@ export function getSessionFromCookies(
   return verifyToken(token)
 }
 
-export function isStoreKey(value: string | null | undefined): value is StoreKey {
-  if (!value) return false
-  return STORE_KEYS.includes(value as StoreKey)
-}
-
-export function resolveStoreFromRequest(
-  request: NextRequest,
-  session: AuthSession
-): StoreKey | null {
-  const storeParam = request.nextUrl.searchParams.get("store")
-  const candidate = storeParam ?? session.currentStore ?? session.stores[0]
-  if (!isStoreKey(candidate)) return null
-  if (!session.stores.includes(candidate)) return null
-  return candidate
-}
-
-export function resolveStoreFromValue(
-  store: string | null | undefined,
-  session: AuthSession
-): StoreKey | null {
-  const candidate = store ?? session.currentStore ?? session.stores[0]
-  if (!isStoreKey(candidate)) return null
-  if (!session.stores.includes(candidate)) return null
-  return candidate
-}
-
-export function updateCurrentStore(
-  session: AuthSession,
-  store: StoreKey
-): AuthSession {
-  if (!session.stores.includes(store)) {
-    throw new Error("User does not have access to this store")
-  }
-  return { ...session, currentStore: store }
-}

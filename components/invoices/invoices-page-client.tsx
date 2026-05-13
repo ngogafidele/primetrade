@@ -4,20 +4,17 @@ import { useState } from "react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { StoreKey } from "@/lib/auth/session"
 import { ProformaInvoicesList } from "@/components/invoices/proforma-list"
 import { SalesInvoicesList, type SaleInvoiceSaleOption } from "@/components/invoices/sales-list"
 
 type ActiveTab = "sales" | "proforma"
 
 export function InvoicesPageClient({
-  storeId,
   canCreateInvoices,
   canManageInvoices,
   canDeleteInvoices,
   sales,
 }: {
-  storeId: StoreKey
   canCreateInvoices: boolean
   canManageInvoices: boolean
   canDeleteInvoices: boolean
@@ -79,7 +76,6 @@ export function InvoicesPageClient({
 
       {activeTab === "sales" ? (
         <SalesInvoicesList
-          storeId={storeId}
           sales={sales}
           canCreateInvoices={canCreateInvoices}
           canManageInvoices={canManageInvoices}
@@ -88,7 +84,6 @@ export function InvoicesPageClient({
         />
       ) : (
         <ProformaInvoicesList
-          storeId={storeId}
           canCreateInvoices={canCreateInvoices}
           canManageInvoices={canManageInvoices}
           canDeleteInvoices={canDeleteInvoices}

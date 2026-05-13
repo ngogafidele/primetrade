@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Sale } from "@/lib/db/models/Sale"
 import { generateSalesInvoicePDF } from "@/lib/pdf/invoice-generator"
@@ -21,17 +20,9 @@ export async function GET(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
     await connectToDatabase()
-    const invoice = await Invoice.findOne({ _id: id, store })
+    const invoice = await Invoice.findById(id)
 
     if (!invoice) {
       return NextResponse.json(
@@ -50,7 +41,7 @@ export async function GET(
     }))
 
     if (items.length === 0 && invoice.saleId) {
-      const sale = await Sale.findOne({ _id: invoice.saleId, store })
+      const sale = await Sale.findById(invoice.saleId)
       items =
         sale?.items.map((item) => ({
           description: item.name,

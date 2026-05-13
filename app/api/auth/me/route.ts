@@ -25,10 +25,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: {
-        ...user.toObject(),
-        currentStore: session.currentStore ?? session.stores[0],
-      },
+      data: user.toObject(),
     })
   } catch (error) {
     return NextResponse.json(

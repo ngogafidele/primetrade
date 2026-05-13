@@ -4,7 +4,6 @@ import { Invoice } from "@/lib/db/models/Invoice"
 import { Product } from "@/lib/db/models/Product"
 import { Sale } from "@/lib/db/models/Sale"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 
 type SaleItemForRestock = {
@@ -25,18 +24,10 @@ export async function GET(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
 
     await connectToDatabase()
-    const sale = await Sale.findOne({ _id: id, store })
+    const sale = await Sale.findById(id)
 
     if (!sale) {
       return NextResponse.json(
@@ -67,18 +58,10 @@ export async function DELETE(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
 
     await connectToDatabase()
-    const sale = await Sale.findOne({ _id: id, store })
+    const sale = await Sale.findById(id)
 
     if (!sale) {
       return NextResponse.json(
@@ -87,7 +70,7 @@ export async function DELETE(
       )
     }
 
-    const invoice = await Invoice.findOne({ saleId: sale._id, store })
+    const invoice = await Invoice.findOne({ saleId: sale._id })
     if (invoice) {
       return NextResponse.json(
         {
@@ -101,7 +84,7 @@ export async function DELETE(
 
     const saleItems = sale.items as SaleItemForRestock[]
     const productIds = saleItems.map((item) => item.productId)
-    const products = await Product.find({ _id: { $in: productIds }, store })
+    const products = await Product.find({ _id: { $in: productIds } })
     const productMap = new Map(
       products.map((product) => [product._id.toString(), product])
     )
@@ -110,7 +93,7 @@ export async function DELETE(
       await Product.bulkWrite(
         saleItems.map((item) => ({
           updateOne: {
-            filter: { _id: item.productId, store },
+            filter: { _id: item.productId },
             update: { $inc: { quantity: item.quantity } },
           },
         }))
@@ -124,7 +107,7 @@ export async function DELETE(
         await Product.bulkWrite(
           saleItems.map((item) => ({
             updateOne: {
-              filter: { _id: item.productId, store },
+              filter: { _id: item.productId },
               update: { $inc: { quantity: -item.quantity } },
             },
           }))
@@ -140,7 +123,6 @@ export async function DELETE(
           if (!product) return
           const newQuantity = product.quantity + item.quantity
           await syncLowStockAlert({
-            store,
             productId: product._id.toString(),
             name: product.name,
             sku: product.sku,

@@ -37,7 +37,6 @@ export async function POST(request: NextRequest) {
       password: hashedPassword,
       isAdmin: true,
       role: "admin",
-      stores: ["store1", "store2"],
       isActive: true,
       lastLogin: loginAt,
     })
@@ -57,8 +56,6 @@ export async function POST(request: NextRequest) {
       email: admin.email,
       isAdmin: true,
       role: "admin",
-      stores: ["store1", "store2"],
-      currentStore: "store1",
       loginLogId: loginLog._id.toString(),
       lastActivityAt: Date.now(),
     }
@@ -72,7 +69,6 @@ export async function POST(request: NextRequest) {
         email: admin.email,
         role: admin.role,
         isAdmin: admin.isAdmin,
-        stores: admin.stores,
       },
     })
 

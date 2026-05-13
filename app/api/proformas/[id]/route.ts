@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { Proforma } from "@/lib/db/models/Proforma"
 import { UpdateProformaSchema } from "@/lib/db/validators/proforma"
 import { ZodError } from "zod"
@@ -19,17 +18,9 @@ export async function GET(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
     await connectToDatabase()
-    const proforma = await Proforma.findOne({ _id: id, storeId: store })
+    const proforma = await Proforma.findById(id)
 
     if (!proforma) {
       return NextResponse.json(
@@ -60,17 +51,9 @@ export async function DELETE(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
     await connectToDatabase()
-    const proforma = await Proforma.findOneAndDelete({ _id: id, storeId: store })
+    const proforma = await Proforma.findOneAndDelete({ _id: id })
 
     if (!proforma) {
       return NextResponse.json(
@@ -108,14 +91,6 @@ export async function PUT(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
     const payload = UpdateProformaSchema.parse(await request.json())
     const items = payload.items.map((item) => {
@@ -132,7 +107,7 @@ export async function PUT(
 
     await connectToDatabase()
     const proforma = await Proforma.findOneAndUpdate(
-      { _id: id, storeId: store },
+      { _id: id },
       {
         customerName: payload.customerName,
         customerEmail: payload.customerEmail ?? "",

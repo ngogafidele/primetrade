@@ -16,11 +16,6 @@ const SaleItemSchema = new Schema(
 
 const SaleSchema = new Schema(
   {
-    store: {
-      type: String,
-      enum: ["store1", "store2"],
-      required: true,
-    },
     items: { type: [SaleItemSchema], required: true },
     totalAmount: { type: Number, required: true, min: 0 },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
@@ -28,8 +23,6 @@ const SaleSchema = new Schema(
   },
   { timestamps: true }
 )
-
-SaleSchema.index({ store: 1 })
 
 export type SaleDocument = mongoose.InferSchemaType<typeof SaleSchema>
 

@@ -1,7 +1,6 @@
 import type { ReactNode } from "react"
 import type { AuthSession } from "@/lib/auth/session"
 import { Sidebar } from "@/components/layout/sidebar"
-import { StoreSwitcher } from "@/components/store-switcher"
 import { LogoutButton } from "@/components/auth/logout-button"
 import { Building2, UserRound } from "lucide-react"
 
@@ -14,7 +13,6 @@ export function AppShell({
   userName?: string
   children: ReactNode
 }) {
-  const currentStore = session.currentStore ?? session.stores[0]
   const displayName = userName ?? session.name ?? session.email
 
   return (
@@ -27,7 +25,7 @@ export function AppShell({
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                B Ikaze Inventory
+                Prime Trade Inventory Management System
               </p>
               <h1 className="text-xl font-semibold sm:text-2xl">Operations Hub</h1>
             </div>
@@ -46,13 +44,6 @@ export function AppShell({
                 </p>
               </div>
             </div>
-            {session.isAdmin ? (
-              <StoreSwitcher
-                currentStore={currentStore}
-                availableStores={session.stores}
-                isAdmin={session.isAdmin}
-              />
-            ) : null}
             <LogoutButton />
           </div>
         </div>

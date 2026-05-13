@@ -86,7 +86,7 @@ export default function Home() {
           </p>
           <h1 className="text-3xl font-semibold sm:text-4xl">Sign in to Operations</h1>
           <p className="max-w-xl text-sm text-muted-foreground">
-            Manage store-level products, sales, and inventory from a single hub.
+            Manage products, sales, and inventory from a single operations hub.
             Admin setup is required only once.
           </p>
         </div>
@@ -104,7 +104,7 @@ export default function Home() {
               <h2 className="text-lg font-semibold">Login</h2>
             </div>
             <p className="text-sm text-muted-foreground">
-              Access your assigned stores and daily operations.
+              Access daily operations.
             </p>
             <div className="mt-4 space-y-3">
               <Input

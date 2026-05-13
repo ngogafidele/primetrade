@@ -1,7 +1,7 @@
 import { connectToDatabase } from "@/lib/db/connection"
 import { StockAdjustment } from "@/lib/db/models/StockAdjustment"
 import { Product } from "@/lib/db/models/Product"
-import { getCurrentStore, requireServerSession } from "@/lib/auth/server"
+import { requireServerSession } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { StockAdjustmentsManager } from "@/components/stock-adjustments/stock-adjustments-manager"
 
@@ -29,13 +29,12 @@ export default async function StockAdjustmentsPage() {
   if (!session.isAdmin) {
     redirect("/sales")
   }
-  const store = getCurrentStore(session)
 
   await connectToDatabase()
-  const adjustments = await StockAdjustment.find({ store })
+  const adjustments = await StockAdjustment.find()
     .sort({ createdAt: -1 })
     .lean<StockAdjustmentPageAdjustment[]>()
-  const products = await Product.find({ store })
+  const products = await Product.find()
     .sort({ name: 1 })
     .lean<StockAdjustmentPageProduct[]>()
 

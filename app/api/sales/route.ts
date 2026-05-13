@@ -3,7 +3,6 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
 import { Sale } from "@/lib/db/models/Sale"
 import { requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { CreateSaleSchema } from "@/lib/db/validators/sale"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 
@@ -17,16 +16,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     await connectToDatabase()
-    const sales = await Sale.find({ store }).sort({ createdAt: -1 })
+    const sales = await Sale.find().sort({ createdAt: -1 })
 
     return NextResponse.json({ success: true, data: sales })
   } catch (error) {
@@ -47,20 +38,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const payload = CreateSaleSchema.parse(await request.json())
 
     await connectToDatabase()
 
     const productIds = payload.items.map((item) => item.productId)
-    const products = await Product.find({ _id: { $in: productIds }, store })
+    const products = await Product.find({ _id: { $in: productIds } })
 
     if (products.length !== productIds.length) {
       return NextResponse.json(
@@ -118,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     for (const [productId, quantity] of requestedQuantities.entries()) {
       const result = await Product.updateOne(
-        { _id: productId, store, quantity: { $gte: quantity } },
+        { _id: productId, quantity: { $gte: quantity } },
         { $inc: { quantity: -quantity } }
       )
 
@@ -127,7 +110,7 @@ export async function POST(request: NextRequest) {
           await Product.bulkWrite(
             decrementedProducts.map((entry) => ({
               updateOne: {
-                filter: { _id: entry.productId, store },
+                filter: { _id: entry.productId },
                 update: { $inc: { quantity: entry.quantity } },
               },
             }))
@@ -148,7 +131,6 @@ export async function POST(request: NextRequest) {
     let sale
     try {
       sale = await Sale.create({
-        store,
         items: saleItems,
         totalAmount,
         createdBy: session.userId,
@@ -159,7 +141,7 @@ export async function POST(request: NextRequest) {
         await Product.bulkWrite(
           decrementedProducts.map((entry) => ({
             updateOne: {
-              filter: { _id: entry.productId, store },
+              filter: { _id: entry.productId },
               update: { $inc: { quantity: entry.quantity } },
             },
           }))
@@ -176,7 +158,6 @@ export async function POST(request: NextRequest) {
             if (!product) return
             const newQuantity = product.quantity - quantity
             await syncLowStockAlert({
-              store,
               productId: product._id.toString(),
               name: product.name,
               sku: product.sku,

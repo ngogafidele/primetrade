@@ -2,12 +2,10 @@
 
 import { FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { STORE_LABELS, type StoreKey } from "@/lib/utils/constants"
 import { formatCurrency } from "@/lib/utils/format"
 import { formatInKigali } from "@/lib/utils/time"
 
-type StoreReport = {
-  store: StoreKey
+type ReportSummary = {
   products: number
   lowStock: number
   inventoryCost: number
@@ -32,7 +30,6 @@ type TopMovingProduct = {
 
 type RecentSale = {
   _id: string
-  store: StoreKey
   createdAt?: string
   totalAmount: number
   items: Array<{
@@ -44,10 +41,9 @@ type RecentSale = {
 }
 
 type ReportPrintButtonProps = {
-  store: StoreKey
   fromLabel: string
   toLabel: string
-  reports: StoreReport[]
+  reports: ReportSummary[]
   topMovingProducts: TopMovingProduct[]
   recentSales: RecentSale[]
 }
@@ -77,7 +73,7 @@ function formatDateTime(date: string | undefined) {
   })
 }
 
-function sumReports(reports: StoreReport[]) {
+function sumReports(reports: ReportSummary[]) {
   return reports.reduce(
     (total, report) => ({
       products: total.products + report.products,
@@ -109,7 +105,6 @@ function sumReports(reports: StoreReport[]) {
 }
 
 export function ReportPrintButton({
-  store,
   fromLabel,
   toLabel,
   reports,
@@ -123,7 +118,6 @@ export function ReportPrintButton({
       return
     }
 
-    const storeName = STORE_LABELS[store]
     const totals = sumReports(reports)
     const generatedAt = formatInKigali(new Date(), {
       month: "short",
@@ -139,7 +133,6 @@ export function ReportPrintButton({
       .map(
         (report) => `
           <tr>
-            <td>${escapeHtml(STORE_LABELS[report.store])}</td>
             <td>${escapeHtml(formatCurrency(report.revenue))}</td>
             <td>${escapeHtml(formatCurrency(report.grossProfit))}</td>
             <td>${escapeHtml(formatNumber(report.sales))}</td>
@@ -178,7 +171,6 @@ export function ReportPrintButton({
         return `
           <tr>
             <td>${escapeHtml(formatDateTime(sale.createdAt))}</td>
-            <td>${escapeHtml(STORE_LABELS[sale.store])}</td>
             <td>${escapeHtml(items || "-")}</td>
             <td>${escapeHtml(formatCurrency(sale.totalAmount))}</td>
           </tr>
@@ -190,7 +182,7 @@ export function ReportPrintButton({
       <!doctype html>
       <html>
         <head>
-          <title>${escapeHtml(storeName)} Report</title>
+          <title>Inventory Report</title>
           <style>
             * { box-sizing: border-box; }
             body {
@@ -346,11 +338,11 @@ export function ReportPrintButton({
           <header>
             <div>
               <p class="eyebrow">Inventory Report</p>
-              <h1>${escapeHtml(storeName)}</h1>
+              <h1>Inventory Report</h1>
               <p>Period: ${escapeHtml(fromLabel)} to ${escapeHtml(toLabel)}</p>
             </div>
             <div class="summary">
-              <p><strong>Multi-Store Inventory</strong></p>
+              <p><strong>Prime Trade Inventory</strong></p>
               <p>Generated ${escapeHtml(generatedAt)}</p>
             </div>
           </header>
@@ -368,11 +360,10 @@ export function ReportPrintButton({
 
           <div class="section-grid">
             <section class="full">
-              <h2>Store Summary</h2>
+              <h2>Summary</h2>
               <table>
                 <thead>
                   <tr>
-                    <th>Store</th>
                     <th>Revenue</th>
                     <th>Gross Profit</th>
                     <th>Sales</th>
@@ -382,7 +373,7 @@ export function ReportPrintButton({
                   </tr>
                 </thead>
                 <tbody>
-                  ${summaryRows || '<tr><td colspan="7">No summary data found.</td></tr>'}
+                  ${summaryRows || '<tr><td colspan="6">No summary data found.</td></tr>'}
                 </tbody>
               </table>
             </section>
@@ -411,13 +402,12 @@ export function ReportPrintButton({
                 <thead>
                   <tr>
                     <th>Time</th>
-                    <th>Store</th>
                     <th>Items</th>
                     <th>Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${recentSaleRows || '<tr><td colspan="4">No sales recorded yet.</td></tr>'}
+                  ${recentSaleRows || '<tr><td colspan="3">No sales recorded yet.</td></tr>'}
                 </tbody>
               </table>
             </section>

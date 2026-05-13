@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Alert } from "@/lib/db/models/Alert"
-import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
+import { requireAdmin } from "@/lib/auth/middleware"
 import { UpdateAlertSchema } from "@/lib/db/validators/alert"
 
 export async function PUT(
@@ -18,20 +17,12 @@ export async function PUT(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
     const payload = UpdateAlertSchema.parse(await request.json())
 
     await connectToDatabase()
     const alert = await Alert.findOneAndUpdate(
-      { _id: id, store },
+      { _id: id },
       {
         ...payload,
         resolvedAt: payload.isResolved ? new Date() : undefined,
@@ -68,18 +59,10 @@ export async function DELETE(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
 
     await connectToDatabase()
-    const alert = await Alert.findOneAndDelete({ _id: id, store })
+    const alert = await Alert.findOneAndDelete({ _id: id })
 
     if (!alert) {
       return NextResponse.json(

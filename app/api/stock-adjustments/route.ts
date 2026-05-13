@@ -3,7 +3,6 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
 import { StockAdjustment } from "@/lib/db/models/StockAdjustment"
 import { requireAdmin } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { CreateStockAdjustmentSchema } from "@/lib/db/validators/stock-adjustment"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 
@@ -17,16 +16,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     await connectToDatabase()
-    const adjustments = await StockAdjustment.find({ store }).sort({ createdAt: -1 })
+    const adjustments = await StockAdjustment.find().sort({ createdAt: -1 })
 
     return NextResponse.json({ success: true, data: adjustments })
   } catch (error) {
@@ -47,18 +38,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const payload = CreateStockAdjustmentSchema.parse(await request.json())
 
     await connectToDatabase()
-    const product = await Product.findOne({ _id: payload.productId, store })
+    const product = await Product.findById(payload.productId)
 
     if (!product) {
       return NextResponse.json(
@@ -70,7 +53,6 @@ export async function POST(request: NextRequest) {
     const updatedProduct = await Product.findOneAndUpdate(
       {
         _id: payload.productId,
-        store,
         quantity: { $gte: Math.max(0, -payload.quantityChange) },
       },
       { $inc: { quantity: payload.quantityChange } },
@@ -85,7 +67,6 @@ export async function POST(request: NextRequest) {
     }
 
     const adjustment = await StockAdjustment.create({
-      store,
       productId: updatedProduct._id,
       sku: updatedProduct.sku,
       quantityChange: payload.quantityChange,
@@ -94,7 +75,6 @@ export async function POST(request: NextRequest) {
     })
 
     await syncLowStockAlert({
-      store,
       productId: updatedProduct._id.toString(),
       name: updatedProduct.name,
       sku: updatedProduct.sku,

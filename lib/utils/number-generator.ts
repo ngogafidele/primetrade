@@ -7,13 +7,13 @@ function formatSequence(sequence: number) {
   return String(sequence).padStart(4, "0")
 }
 
-async function generateNumber(storeId: string, type: SequenceType) {
+async function generateNumber(type: SequenceType) {
   const nowParts = getKigaliDateParts(new Date())
   const year = nowParts.year
   const month = nowParts.month
 
   const sequence = await NumberSequence.findOneAndUpdate(
-    { storeId, type, year, month },
+    { type, year, month },
     { $inc: { sequence: 1 } },
     {
       new: true,
@@ -33,10 +33,10 @@ async function generateNumber(storeId: string, type: SequenceType) {
   return `${prefix}-${period}-${formatSequence(sequence.sequence)}`
 }
 
-export async function generateInvoiceNumber(storeId: string): Promise<string> {
-  return generateNumber(storeId, "invoice")
+export async function generateInvoiceNumber(): Promise<string> {
+  return generateNumber("invoice")
 }
 
-export async function generateProformaNumber(storeId: string): Promise<string> {
-  return generateNumber(storeId, "proforma")
+export async function generateProformaNumber(): Promise<string> {
+  return generateNumber("proforma")
 }

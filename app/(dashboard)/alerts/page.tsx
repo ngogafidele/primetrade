@@ -1,6 +1,6 @@
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
-import { getCurrentStore, requireServerSession } from "@/lib/auth/server"
+import { requireServerSession } from "@/lib/auth/server"
 import {
   Table,
   TableBody,
@@ -21,11 +21,9 @@ type AlertsPageProduct = {
 
 export default async function AlertsPage() {
   const session = await requireServerSession()
-  const store = getCurrentStore(session)
 
   await connectToDatabase()
   const lowStockProducts = await Product.find({
-    store,
     $expr: { $lte: ["$quantity", { $ifNull: ["$lowStockThreshold", 0] }] },
   })
     .sort({ quantity: 1, name: 1 })

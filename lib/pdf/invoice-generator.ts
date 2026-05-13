@@ -191,7 +191,7 @@ function writeInvoicePdf(
   doc
     .fontSize(11)
     .fillColor("#17201b")
-    .text(storeInfo.name ?? "Multi-Store Inventory", 48, 230)
+    .text(storeInfo.name ?? "Prime Trade Inventory", 48, 230)
     .fontSize(9)
     .fillColor("#53645b")
     .text(storeInfo.address ?? "", 48, 248)

@@ -9,7 +9,6 @@ export type SaleItem = {
 
 export type Sale = {
   id: string
-  store: "store1" | "store2"
   items: SaleItem[]
   totalAmount: number
   createdAt: string

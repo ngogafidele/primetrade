@@ -3,7 +3,6 @@ import { redirect } from "next/navigation"
 import {
   getSessionFromCookies,
   type AuthSession,
-  type StoreKey,
 } from "@/lib/auth/session"
 
 export async function requireServerSession(): Promise<AuthSession> {
@@ -13,8 +12,4 @@ export async function requireServerSession(): Promise<AuthSession> {
     redirect("/")
   }
   return session
-}
-
-export function getCurrentStore(session: AuthSession): StoreKey {
-  return session.currentStore ?? session.stores[0]
 }

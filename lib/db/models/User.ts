@@ -12,13 +12,6 @@ const UserSchema = new Schema(
       enum: ["admin", "manager", "staff"],
       default: "staff",
     },
-    stores: [
-      {
-        type: String,
-        enum: ["store1", "store2"],
-        required: true,
-      },
-    ],
     lastLogin: { type: Date },
     lastLogout: { type: Date },
   },

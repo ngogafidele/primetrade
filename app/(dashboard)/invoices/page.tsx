@@ -1,6 +1,6 @@
 import { connectToDatabase } from "@/lib/db/connection"
 import { Sale } from "@/lib/db/models/Sale"
-import { getCurrentStore, requireServerSession } from "@/lib/auth/server"
+import { requireServerSession } from "@/lib/auth/server"
 import { InvoicesPageClient } from "@/components/invoices/invoices-page-client"
 import { formatInKigali } from "@/lib/utils/time"
 
@@ -12,10 +12,9 @@ type InvoicePageSale = {
 
 export default async function InvoicesPage() {
   const session = await requireServerSession()
-  const store = getCurrentStore(session)
 
   await connectToDatabase()
-  const sales = await Sale.find({ store })
+  const sales = await Sale.find()
     .select("totalAmount createdAt")
     .sort({ createdAt: -1 })
     .lean<InvoicePageSale[]>()
@@ -36,7 +35,6 @@ export default async function InvoicesPage() {
 
   return (
     <InvoicesPageClient
-      storeId={store}
       sales={serializedSales}
       canCreateInvoices={true}
       canManageInvoices={session.isAdmin || session.role === "manager"}

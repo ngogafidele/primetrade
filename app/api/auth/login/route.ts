@@ -50,15 +50,12 @@ export async function POST(request: NextRequest) {
     })
     await pruneOldLoginLogs()
 
-    const stores = user.stores as AuthSession["stores"]
     const session: AuthSession = {
       userId: user._id.toString(),
       name: user.name,
       email: user.email,
       isAdmin: user.isAdmin,
       role: user.role,
-      stores,
-      currentStore: stores[0],
       loginLogId: loginLog._id.toString(),
       lastActivityAt: Date.now(),
     }
@@ -72,8 +69,6 @@ export async function POST(request: NextRequest) {
         email: user.email,
         role: user.role,
         isAdmin: user.isAdmin,
-        stores,
-        currentStore: session.currentStore,
       },
     })
 

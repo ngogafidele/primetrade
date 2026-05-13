@@ -328,7 +328,7 @@ export function ProductsManager({
           <header>
             <div>
               <h1>Products Catalog</h1>
-              <p>Complete product list for the current store.</p>
+              <p>Complete product list for the business.</p>
             </div>
             <div class="summary">
               <p><strong>${products.length}</strong> products</p>

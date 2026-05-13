@@ -1,6 +1,6 @@
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
-import { getCurrentStore, requireServerSession } from "@/lib/auth/server"
+import { requireServerSession } from "@/lib/auth/server"
 import { ProductsManager } from "@/components/products/products-manager"
 
 type ProductsPageProduct = {
@@ -18,10 +18,9 @@ type ProductsPageProduct = {
 
 export default async function ProductsPage() {
   const session = await requireServerSession()
-  const store = getCurrentStore(session)
 
   await connectToDatabase()
-  const products = await Product.find({ store }).lean<ProductsPageProduct[]>()
+  const products = await Product.find().lean<ProductsPageProduct[]>()
 
   const serializedProducts = products.map((product) => {
     return {

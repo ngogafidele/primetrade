@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { Proforma } from "@/lib/db/models/Proforma"
 import { generateProformaPDF } from "@/lib/pdf/invoice-generator"
 
@@ -20,17 +19,9 @@ export async function GET(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
     await connectToDatabase()
-    const proforma = await Proforma.findOne({ _id: id, storeId: store })
+    const proforma = await Proforma.findById(id)
 
     if (!proforma) {
       return NextResponse.json(

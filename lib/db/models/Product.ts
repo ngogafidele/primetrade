@@ -13,17 +13,11 @@ const ProductSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Category",
     },
-    store: {
-      type: String,
-      enum: ["store1", "store2"],
-      required: true,
-    },
   },
   { timestamps: true }
 )
 
-ProductSchema.index({ store: 1 })
-ProductSchema.index({ store: 1, sku: 1 }, { unique: true })
+ProductSchema.index({ sku: 1 }, { unique: true })
 
 export type ProductDocument = mongoose.InferSchemaType<typeof ProductSchema>
 

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Alert } from "@/lib/db/models/Alert"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { CreateAlertSchema } from "@/lib/db/validators/alert"
 
 export async function GET(request: NextRequest) {
@@ -15,20 +14,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const resolved = request.nextUrl.searchParams.get("resolved")
     const isResolved = resolved === "true" ? true : resolved === "false" ? false : undefined
 
     await connectToDatabase()
 
-    const filter: Record<string, unknown> = { store }
+    const filter: Record<string, unknown> = {}
     if (typeof isResolved === "boolean") {
       filter.isResolved = isResolved
     }
@@ -54,14 +45,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const payload = CreateAlertSchema.parse(await request.json())
     if (payload.type === "low-stock") {
       return NextResponse.json(
@@ -73,7 +56,6 @@ export async function POST(request: NextRequest) {
     await connectToDatabase()
     const alert = await Alert.create({
       ...payload,
-      store,
       isResolved: false,
     })
 

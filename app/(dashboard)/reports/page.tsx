@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation"
 import { connection } from "next/server"
-import { getCurrentStore, requireServerSession } from "@/lib/auth/server"
+import { requireServerSession } from "@/lib/auth/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Product } from "@/lib/db/models/Product"
 import { Sale } from "@/lib/db/models/Sale"
 import { StockAdjustment } from "@/lib/db/models/StockAdjustment"
-import { STORE_LABELS } from "@/lib/utils/constants"
 import { formatCurrency } from "@/lib/utils/format"
 import {
   formatInKigali,
@@ -26,10 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-type StoreKey = "store1" | "store2"
-
-type StoreReport = {
-  store: StoreKey
+type ReportSummary = {
   products: number
   lowStock: number
   inventoryCost: number
@@ -44,7 +40,7 @@ type StoreReport = {
 }
 
 type SaleTotals = {
-  _id: StoreKey
+  _id: null
   sales: number
   revenue: number
   grossProfit: number
@@ -52,7 +48,7 @@ type SaleTotals = {
 }
 
 type ProductTotals = {
-  _id: StoreKey
+  _id: null
   products: number
   lowStock: number
   inventoryCost: number
@@ -60,14 +56,14 @@ type ProductTotals = {
 }
 
 type InvoiceTotals = {
-  _id: StoreKey
+  _id: null
   invoices: number
   unpaidInvoices: number
   outstanding: number
 }
 
 type AdjustmentTotals = {
-  _id: StoreKey
+  _id: null
   adjustments: number
 }
 
@@ -87,7 +83,6 @@ type TopMovingProduct = {
 
 type RecentSale = {
   _id: string
-  store: StoreKey
   createdAt?: Date
   totalAmount: number
   items: Array<{
@@ -173,7 +168,7 @@ function formatDateOnly(date: Date) {
   })
 }
 
-function sumReports(reports: StoreReport[]) {
+function sumReports(reports: ReportSummary[]) {
   return reports.reduce(
     (total, report) => ({
       products: total.products + report.products,
@@ -214,8 +209,6 @@ export default async function ReportsPage({
   if (!session.isAdmin) {
     redirect("/sales")
   }
-
-  const currentStore = getCurrentStore(session)
   const range = getReportRange(await searchParams)
   const periodFilter = {
     $gte: range.from,
@@ -233,10 +226,10 @@ export default async function ReportsPage({
     recentSales,
   ] = await Promise.all([
     Product.aggregate<ProductTotals>([
-      { $match: { store: currentStore } },
+      { $match: {} },
       {
         $group: {
-          _id: "$store",
+          _id: null,
           products: { $sum: 1 },
           lowStock: {
             $sum: {
@@ -257,11 +250,11 @@ export default async function ReportsPage({
       },
     ]),
     Sale.aggregate<SaleTotals>([
-      { $match: { store: currentStore, createdAt: periodFilter } },
+      { $match: { createdAt: periodFilter } },
       { $unwind: { path: "$items", preserveNullAndEmptyArrays: true } },
       {
         $group: {
-          _id: "$store",
+          _id: null,
           saleIds: { $addToSet: "$_id" },
           revenue: { $sum: "$items.lineTotal" },
           unitsSold: { $sum: "$items.quantity" },
@@ -285,10 +278,10 @@ export default async function ReportsPage({
       },
     ]),
     Invoice.aggregate<InvoiceTotals>([
-      { $match: { store: currentStore, issuedAt: periodFilter } },
+      { $match: { issuedAt: periodFilter } },
       {
         $group: {
-          _id: "$store",
+          _id: null,
           invoices: { $sum: 1 },
           unpaidInvoices: {
             $sum: { $cond: [{ $eq: ["$status", "unpaid"] }, 1, 0] },
@@ -302,16 +295,16 @@ export default async function ReportsPage({
       },
     ]),
     StockAdjustment.aggregate<AdjustmentTotals>([
-      { $match: { store: currentStore, createdAt: periodFilter } },
+      { $match: { createdAt: periodFilter } },
       {
         $group: {
-          _id: "$store",
+          _id: null,
           adjustments: { $sum: 1 },
         },
       },
     ]),
     Sale.aggregate<TopMovingProduct>([
-      { $match: { store: currentStore, createdAt: periodFilter } },
+      { $match: { createdAt: periodFilter } },
       { $unwind: "$items" },
       {
         $group: {
@@ -346,48 +339,34 @@ export default async function ReportsPage({
         },
       },
     ]),
-    Sale.find({ store: currentStore, createdAt: periodFilter })
-      .select("store items totalAmount createdAt")
+    Sale.find({ createdAt: periodFilter })
+      .select("items totalAmount createdAt")
       .sort({ createdAt: -1 })
       .limit(8)
       .lean<RecentSale[]>(),
   ])
 
-  const productMap = new Map(productTotals.map((item) => [item._id, item]))
-  const saleMap = new Map(saleTotals.map((item) => [item._id, item]))
-  const invoiceMap = new Map(invoiceTotals.map((item) => [item._id, item]))
-  const adjustmentMap = new Map(
-    adjustmentTotals.map((item) => [item._id, item])
-  )
+  const report: ReportSummary = {
+    products: productTotals[0]?.products ?? 0,
+    lowStock: productTotals[0]?.lowStock ?? 0,
+    inventoryCost: productTotals[0]?.inventoryCost ?? 0,
+    inventoryRetail: productTotals[0]?.inventoryRetail ?? 0,
+    sales: saleTotals[0]?.sales ?? 0,
+    revenue: saleTotals[0]?.revenue ?? 0,
+    grossProfit: saleTotals[0]?.grossProfit ?? 0,
+    invoices: invoiceTotals[0]?.invoices ?? 0,
+    unpaidInvoices: invoiceTotals[0]?.unpaidInvoices ?? 0,
+    outstanding: invoiceTotals[0]?.outstanding ?? 0,
+    adjustments: adjustmentTotals[0]?.adjustments ?? 0,
+  }
 
-  const storeReports = [currentStore].map((store) => {
-    const products = productMap.get(store)
-    const sales = saleMap.get(store)
-    const invoices = invoiceMap.get(store)
-    const adjustments = adjustmentMap.get(store)
+  const reports = [report]
 
-    return {
-      store,
-      products: products?.products ?? 0,
-      lowStock: products?.lowStock ?? 0,
-      inventoryCost: products?.inventoryCost ?? 0,
-      inventoryRetail: products?.inventoryRetail ?? 0,
-      sales: sales?.sales ?? 0,
-      revenue: sales?.revenue ?? 0,
-      grossProfit: sales?.grossProfit ?? 0,
-      invoices: invoices?.invoices ?? 0,
-      unpaidInvoices: invoices?.unpaidInvoices ?? 0,
-      outstanding: invoices?.outstanding ?? 0,
-      adjustments: adjustments?.adjustments ?? 0,
-    } satisfies StoreReport
-  })
-
-  const totals = sumReports(storeReports)
+  const totals = sumReports(reports)
   const fromLabel = formatDateOnly(range.from)
   const toLabel = formatDateOnly(range.to)
   const printableRecentSales = recentSales.map((sale) => ({
     _id: sale._id.toString(),
-    store: sale.store,
     createdAt: sale.createdAt?.toISOString(),
     totalAmount: sale.totalAmount,
     items: sale.items.map((item) => ({
@@ -413,12 +392,11 @@ export default async function ReportsPage({
     <div className="space-y-6">
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          {STORE_LABELS[currentStore]} Overview
+          Business Overview
         </p>
         <h2 className="text-2xl font-semibold">Reports</h2>
         <p className="text-sm text-muted-foreground">
-          Reports for {STORE_LABELS[currentStore]} from {fromLabel} to{" "}
-          {toLabel}.
+          Reports from {fromLabel} to {toLabel}.
         </p>
       </div>
 
@@ -441,10 +419,9 @@ export default async function ReportsPage({
         </div>
         <div className="flex items-end">
           <ReportPrintButton
-            store={currentStore}
             fromLabel={fromLabel}
             toLabel={toLabel}
-            reports={storeReports}
+            reports={reports}
             topMovingProducts={topMovingProducts}
             recentSales={printableRecentSales}
           />
@@ -470,16 +447,13 @@ export default async function ReportsPage({
       <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Store Summary
+            Summary
           </p>
-          <h3 className="text-lg font-semibold">
-            {STORE_LABELS[currentStore]} Performance
-          </h3>
+          <h3 className="text-lg font-semibold">Performance</h3>
         </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Store</TableHead>
               <TableHead>Revenue</TableHead>
               <TableHead>Gross Profit</TableHead>
               <TableHead>Sales</TableHead>
@@ -489,9 +463,8 @@ export default async function ReportsPage({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {storeReports.map((report) => (
-              <TableRow key={report.store}>
-                <TableCell>{STORE_LABELS[report.store]}</TableCell>
+            {reports.map((report, index) => (
+              <TableRow key={index}>
                 <TableCell>{formatCurrency(report.revenue)}</TableCell>
                 <TableCell>{formatCurrency(report.grossProfit)}</TableCell>
                 <TableCell>{formatNumber(report.sales)}</TableCell>
@@ -561,7 +534,6 @@ export default async function ReportsPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Time</TableHead>
-                <TableHead>Store</TableHead>
                 <TableHead>Items</TableHead>
                 <TableHead>Total</TableHead>
               </TableRow>
@@ -569,7 +541,7 @@ export default async function ReportsPage({
             <TableBody>
               {recentSales.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-muted-foreground">
+                  <TableCell colSpan={3} className="text-muted-foreground">
                     No sales recorded yet.
                   </TableCell>
                 </TableRow>
@@ -577,7 +549,6 @@ export default async function ReportsPage({
                 recentSales.map((sale) => (
                   <TableRow key={sale._id.toString()}>
                     <TableCell>{formatDateTime(sale.createdAt)}</TableCell>
-                    <TableCell>{STORE_LABELS[sale.store]}</TableCell>
                     <TableCell>
                       <span className="whitespace-normal break-words">
                         {sale.items

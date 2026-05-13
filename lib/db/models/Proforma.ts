@@ -13,11 +13,6 @@ const ProformaItemSchema = new Schema(
 
 const ProformaSchema = new Schema(
   {
-    storeId: {
-      type: String,
-      enum: ["store1", "store2"],
-      required: true,
-    },
     saleId: { type: Schema.Types.ObjectId, ref: "Sale" },
     proformaNumber: { type: String, required: true },
     customerName: { type: String, required: true, trim: true },
@@ -31,9 +26,8 @@ const ProformaSchema = new Schema(
   { timestamps: true }
 )
 
-ProformaSchema.index({ storeId: 1 })
-ProformaSchema.index({ storeId: 1, saleId: 1 })
-ProformaSchema.index({ storeId: 1, proformaNumber: 1 }, { unique: true })
+ProformaSchema.index({ saleId: 1 })
+ProformaSchema.index({ proformaNumber: 1 }, { unique: true })
 
 export type ProformaDocument = mongoose.InferSchemaType<typeof ProformaSchema>
 

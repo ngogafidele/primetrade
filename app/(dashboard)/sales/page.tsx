@@ -2,7 +2,7 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { Sale } from "@/lib/db/models/Sale"
 import { Product } from "@/lib/db/models/Product"
 import "@/lib/db/models/User"
-import { getCurrentStore, requireServerSession } from "@/lib/auth/server"
+import { requireServerSession } from "@/lib/auth/server"
 import { SalesManager } from "@/components/sales/sales-manager"
 import { formatInKigali } from "@/lib/utils/time"
 
@@ -54,14 +54,13 @@ function isPopulatedSaleUser(
 
 export default async function SalesPage() {
   const session = await requireServerSession()
-  const store = getCurrentStore(session)
 
   await connectToDatabase()
-  const sales = await Sale.find({ store })
+  const sales = await Sale.find()
     .populate("createdBy", "name email")
     .sort({ createdAt: -1 })
     .lean<SalesPageSale[]>()
-  const products = await Product.find({ store })
+  const products = await Product.find()
     .sort({ name: 1 })
     .lean<SalesPageProduct[]>()
 

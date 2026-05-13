@@ -4,7 +4,6 @@ import { User } from "@/lib/db/models/User"
 import { requireAdmin } from "@/lib/auth/middleware"
 import { CreateUserSchema } from "@/lib/db/validators/user"
 import { hashPassword } from "@/lib/auth/hash"
-import { isStoreKey } from "@/lib/auth/session"
 import { ZodError } from "zod"
 
 function isDuplicateKeyError(error: unknown) {
@@ -39,12 +38,7 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase()
 
-    const store = request.nextUrl.searchParams.get("store")
-    const filter = isStoreKey(store)
-      ? { stores: { $in: [store] } }
-      : {}
-
-    const users = await User.find(filter).select("-password")
+    const users = await User.find().select("-password")
 
     return NextResponse.json({ success: true, data: users })
   } catch (error) {
@@ -82,7 +76,6 @@ export async function POST(request: NextRequest) {
       email: body.email.toLowerCase(),
       password: hashedPassword,
       role: body.role,
-      stores: [body.stores],
       isActive: body.isActive ?? true,
       isAdmin: false,
     })
@@ -95,7 +88,6 @@ export async function POST(request: NextRequest) {
           name: user.name,
           email: user.email,
           role: user.role,
-          stores: user.stores,
           isActive: user.isActive,
           isAdmin: user.isAdmin,
         },

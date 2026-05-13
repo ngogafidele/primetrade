@@ -14,11 +14,6 @@ const InvoiceItemSchema = new Schema(
 
 const InvoiceSchema = new Schema(
   {
-    store: {
-      type: String,
-      enum: ["store1", "store2"],
-      required: true,
-    },
     saleId: { type: Schema.Types.ObjectId, ref: "Sale" },
     proformaId: { type: Schema.Types.ObjectId, ref: "Proforma" },
     sourceType: {
@@ -43,10 +38,9 @@ const InvoiceSchema = new Schema(
   { timestamps: true }
 )
 
-InvoiceSchema.index({ store: 1 })
-InvoiceSchema.index({ store: 1, invoiceNumber: 1 }, { unique: true })
-InvoiceSchema.index({ store: 1, saleId: 1 })
-InvoiceSchema.index({ store: 1, proformaId: 1 })
+InvoiceSchema.index({ invoiceNumber: 1 }, { unique: true })
+InvoiceSchema.index({ saleId: 1 })
+InvoiceSchema.index({ proformaId: 1 })
 
 export type InvoiceDocument = mongoose.InferSchemaType<typeof InvoiceSchema>
 

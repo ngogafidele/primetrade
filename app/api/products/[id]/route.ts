@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
-import { resolveStoreFromRequest } from "@/lib/auth/session"
 import { UpdateProductSchema } from "@/lib/db/validators/product"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 import { ZodError } from "zod"
@@ -20,18 +19,10 @@ export async function GET(
       )
     }
 
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     const { id } = await context.params
 
     await connectToDatabase()
-    const product = await Product.findOne({ _id: id, store })
+    const product = await Product.findById(id)
 
     if (!product) {
       return NextResponse.json(
@@ -63,13 +54,6 @@ export async function PUT(
     }
 
     const { id } = await context.params
-    const store = resolveStoreFromRequest(request, session)
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Invalid store" },
-        { status: 400 }
-      )
-    }
 
     const payload = UpdateProductSchema.parse(await request.json())
     const { categoryId: _categoryId, ...updateInput } = payload
@@ -77,7 +61,7 @@ export async function PUT(
     await connectToDatabase()
 
     const product = await Product.findOneAndUpdate(
-      { _id: id, store },
+      { _id: id },
       updateInput,
       { returnDocument: "after", runValidators: true }
     )
@@ -90,7 +74,6 @@ export async function PUT(
     }
 
     await syncLowStockAlert({
-      store,
       productId: product._id.toString(),
       name: product.name,
       sku: product.sku,
@@ -127,17 +110,8 @@ export async function DELETE(
     }
 
     const { id } = await context.params
-    const store = resolveStoreFromRequest(request, session)
-
-    if (!store) {
-      return NextResponse.json(
-        { success: false, error: "Access denied" },
-        { status: 403 }
-      )
-    }
-
     await connectToDatabase()
-    const product = await Product.findOneAndDelete({ _id: id, store })
+    const product = await Product.findOneAndDelete({ _id: id })
 
     if (!product) {
       return NextResponse.json(

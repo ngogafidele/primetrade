@@ -72,12 +72,7 @@ export async function PUT(
       body.email = body.email.toLowerCase()
     }
 
-    const updateData = {
-      ...body,
-      ...(body.stores ? { stores: [body.stores] } : {}),
-    }
-
-    const user = await User.findByIdAndUpdate(id, updateData, {
+    const user = await User.findByIdAndUpdate(id, body, {
       returnDocument: "after",
       runValidators: true,
     }).select("-password")

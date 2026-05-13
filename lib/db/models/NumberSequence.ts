@@ -2,7 +2,6 @@ import mongoose, { Schema } from "mongoose"
 
 const NumberSequenceSchema = new Schema(
   {
-    storeId: { type: String, required: true },
     type: {
       type: String,
       enum: ["invoice", "proforma"],
@@ -16,7 +15,7 @@ const NumberSequenceSchema = new Schema(
 )
 
 NumberSequenceSchema.index(
-  { storeId: 1, type: 1, year: 1, month: 1 },
+  { type: 1, year: 1, month: 1 },
   { unique: true }
 )
 

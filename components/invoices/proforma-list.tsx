@@ -27,7 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import type { StoreKey } from "@/lib/auth/session"
 import { formatCurrency } from "@/lib/utils/format"
 import { formatInKigali } from "@/lib/utils/time"
 
@@ -100,13 +99,11 @@ function formatDate(date: string | undefined) {
 }
 
 export function ProformaInvoicesList({
-  storeId,
   canCreateInvoices,
   canManageInvoices,
   canDeleteInvoices,
   newInvoiceSignal,
 }: {
-  storeId: StoreKey
   canCreateInvoices: boolean
   canManageInvoices: boolean
   canDeleteInvoices: boolean
@@ -126,8 +123,7 @@ export function ProformaInvoicesList({
 
   useEffect(() => {
     async function loadProformas() {
-      const params = new URLSearchParams({ store: storeId })
-      const response = await fetch(`/api/proformas?${params.toString()}`)
+      const response = await fetch("/api/proformas")
       const body = await response.json()
       if (response.ok && body?.success) {
         setProformas(
@@ -140,7 +136,7 @@ export function ProformaInvoicesList({
     }
 
     loadProformas().catch(() => setError("Failed to load proforma invoices."))
-  }, [storeId])
+  }, [])
 
   useEffect(() => {
     if (
@@ -262,8 +258,8 @@ export function ProformaInvoicesList({
     try {
       const response = await fetch(
         activeProformaId
-          ? `/api/proformas/${activeProformaId}?store=${storeId}`
-          : `/api/proformas?store=${storeId}`,
+          ? `/api/proformas/${activeProformaId}`
+          : "/api/proformas",
         {
           method: activeProformaId ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -319,7 +315,7 @@ export function ProformaInvoicesList({
 
     try {
       const response = await fetch(
-        `/api/proformas/${proforma._id}/pdf?store=${storeId}`
+        `/api/proformas/${proforma._id}/pdf`
       )
       if (!response.ok) {
         const body = await response.json().catch(() => null)
@@ -351,7 +347,7 @@ export function ProformaInvoicesList({
 
     try {
       const response = await fetch(
-        `/api/proformas/${proforma._id}?store=${storeId}`,
+        `/api/proformas/${proforma._id}`,
         { method: "DELETE" }
       )
       const body = await response.json().catch(() => null)
