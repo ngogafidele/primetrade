@@ -10,6 +10,8 @@ import {
   LayoutDashboard,
   PackageSearch,
   ReceiptText,
+  RotateCcw,
+  Wallet,
   Users,
   Wrench,
 } from "lucide-react"
@@ -24,6 +26,8 @@ const adminOnlyNavItems = [
 const commonNavItems = [
   { href: "/products", label: "Products", icon: PackageSearch },
   { href: "/sales", label: "Sales", icon: ReceiptText },
+  { href: "/returns", label: "Returns", icon: RotateCcw },
+  { href: "/expenses", label: "Expenses", icon: Wallet },
   { href: "/invoices", label: "Invoices", icon: ClipboardList },
   { href: "/alerts", label: "Low Stock Alerts", icon: Bell },
 ]

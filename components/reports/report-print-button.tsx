@@ -7,12 +7,15 @@ import { formatInKigali } from "@/lib/utils/time"
 
 type ReportSummary = {
   products: number
-  lowStock: number
   inventoryCost: number
   inventoryRetail: number
   sales: number
   revenue: number
   grossProfit: number
+  expenses: number
+  revenueCash: number
+  revenueMobileMoney: number
+  revenueBank: number
   invoices: number
   unpaidInvoices: number
   outstanding: number
@@ -77,12 +80,15 @@ function sumReports(reports: ReportSummary[]) {
   return reports.reduce(
     (total, report) => ({
       products: total.products + report.products,
-      lowStock: total.lowStock + report.lowStock,
       inventoryCost: total.inventoryCost + report.inventoryCost,
       inventoryRetail: total.inventoryRetail + report.inventoryRetail,
       sales: total.sales + report.sales,
       revenue: total.revenue + report.revenue,
       grossProfit: total.grossProfit + report.grossProfit,
+      expenses: total.expenses + report.expenses,
+      revenueCash: total.revenueCash + report.revenueCash,
+      revenueMobileMoney: total.revenueMobileMoney + report.revenueMobileMoney,
+      revenueBank: total.revenueBank + report.revenueBank,
       invoices: total.invoices + report.invoices,
       unpaidInvoices: total.unpaidInvoices + report.unpaidInvoices,
       outstanding: total.outstanding + report.outstanding,
@@ -90,12 +96,15 @@ function sumReports(reports: ReportSummary[]) {
     }),
     {
       products: 0,
-      lowStock: 0,
       inventoryCost: 0,
       inventoryRetail: 0,
       sales: 0,
       revenue: 0,
       grossProfit: 0,
+      expenses: 0,
+      revenueCash: 0,
+      revenueMobileMoney: 0,
+      revenueBank: 0,
       invoices: 0,
       unpaidInvoices: 0,
       outstanding: 0,
@@ -126,18 +135,21 @@ export function ReportPrintButton({
       hour: "2-digit",
       minute: "2-digit",
     })
-    const lowStockClass = totals.lowStock > 0 ? "metric danger" : "metric"
     const outstandingClass = totals.outstanding > 0 ? "metric warning" : "metric"
+    const expenseClass = totals.expenses > 0 ? "metric warning" : "metric"
 
     const summaryRows = reports
       .map(
         (report) => `
           <tr>
             <td>${escapeHtml(formatCurrency(report.revenue))}</td>
-            <td>${escapeHtml(formatCurrency(report.grossProfit))}</td>
+            <td>${escapeHtml(formatCurrency(report.grossProfit - report.expenses))}</td>
+            <td>${escapeHtml(formatCurrency(report.expenses))}</td>
+            <td>${escapeHtml(formatCurrency(report.revenueCash))}</td>
+            <td>${escapeHtml(formatCurrency(report.revenueMobileMoney))}</td>
+            <td>${escapeHtml(formatCurrency(report.revenueBank))}</td>
             <td>${escapeHtml(formatNumber(report.sales))}</td>
             <td>${escapeHtml(formatNumber(report.products))}</td>
-            <td>${escapeHtml(formatNumber(report.lowStock))}</td>
             <td>${escapeHtml(formatCurrency(report.outstanding))}</td>
           </tr>
         `
@@ -349,12 +361,15 @@ export function ReportPrintButton({
 
           <div class="metrics">
             <div class="metric"><span>Total Revenue</span><strong>${escapeHtml(formatCurrency(totals.revenue))}</strong></div>
-            <div class="metric"><span>Gross Profit</span><strong>${escapeHtml(formatCurrency(totals.grossProfit))}</strong></div>
+            <div class="metric"><span>Profit</span><strong>${escapeHtml(formatCurrency(totals.grossProfit - totals.expenses))}</strong></div>
+            <div class="${expenseClass}"><span>Expenses</span><strong>${escapeHtml(formatCurrency(totals.expenses))}</strong></div>
+            <div class="metric"><span>Cash</span><strong>${escapeHtml(formatCurrency(totals.revenueCash))}</strong></div>
+            <div class="metric"><span>Mobile Money</span><strong>${escapeHtml(formatCurrency(totals.revenueMobileMoney))}</strong></div>
+            <div class="metric"><span>Bank</span><strong>${escapeHtml(formatCurrency(totals.revenueBank))}</strong></div>
             <div class="metric"><span>Inventory Cost</span><strong>${escapeHtml(formatCurrency(totals.inventoryCost))}</strong></div>
             <div class="metric"><span>Inventory Retail</span><strong>${escapeHtml(formatCurrency(totals.inventoryRetail))}</strong></div>
             <div class="metric"><span>Sales Records</span><strong>${escapeHtml(formatNumber(totals.sales))}</strong></div>
             <div class="metric"><span>Products</span><strong>${escapeHtml(formatNumber(totals.products))}</strong></div>
-            <div class="${lowStockClass}"><span>Low Stock</span><strong>${escapeHtml(formatNumber(totals.lowStock))}</strong></div>
             <div class="${outstandingClass}"><span>Outstanding</span><strong>${escapeHtml(formatCurrency(totals.outstanding))}</strong></div>
           </div>
 
@@ -365,15 +380,18 @@ export function ReportPrintButton({
                 <thead>
                   <tr>
                     <th>Revenue</th>
-                    <th>Gross Profit</th>
+                    <th>Profit</th>
+                    <th>Expenses</th>
+                    <th>Cash</th>
+                    <th>Mobile Money</th>
+                    <th>Bank</th>
                     <th>Sales</th>
                     <th>Products</th>
-                    <th>Low Stock</th>
                     <th>Outstanding</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${summaryRows || '<tr><td colspan="6">No summary data found.</td></tr>'}
+                  ${summaryRows || '<tr><td colspan="9">No summary data found.</td></tr>'}
                 </tbody>
               </table>
             </section>

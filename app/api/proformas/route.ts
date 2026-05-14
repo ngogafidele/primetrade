@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
           customerName: payload.customerName,
           customerEmail: payload.customerEmail ?? "",
           customerPhone: payload.customerPhone ?? "",
+          createdBy: session.userId,
           items,
           totalAmount,
           issuedAt: new Date(),

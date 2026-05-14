@@ -1,19 +1,18 @@
 import { z } from "zod"
 import { objectIdSchema } from "@/lib/db/validators/shared"
 
-export const SaleItemSchema = z
+export const ReturnItemSchema = z
   .object({
     productId: objectIdSchema,
     quantity: z.number().int().min(1),
-    sellingPrice: z.number().min(0),
+    unitPrice: z.number().min(0),
   })
   .strict()
 
-export const CreateSaleSchema = z
+export const CreateReturnSchema = z
   .object({
-    items: z.array(SaleItemSchema).min(1),
-    paymentStatus: z.enum(["paid", "unpaid"]),
-    paymentMethod: z.enum(["cash", "mobile-money", "bank"]),
+    returnItems: z.array(ReturnItemSchema).min(1),
+    replacementItems: z.array(ReturnItemSchema).min(1),
     notes: z.string().optional(),
   })
   .strict()

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { requireAuth } from "@/lib/auth/middleware"
 import { Invoice } from "@/lib/db/models/Invoice"
+import "@/lib/db/models/User"
 import { Sale } from "@/lib/db/models/Sale"
 import { generateSalesInvoicePDF } from "@/lib/pdf/invoice-generator"
 
@@ -22,7 +23,10 @@ export async function GET(
 
     const { id } = await context.params
     await connectToDatabase()
-    const invoice = await Invoice.findById(id)
+    const invoice = await Invoice.findById(id).populate(
+      "createdBy",
+      "name email"
+    )
 
     if (!invoice) {
       return NextResponse.json(
@@ -53,6 +57,11 @@ export async function GET(
         })) ?? []
     }
 
+    const processedBy =
+      typeof invoice.createdBy === "object" && invoice.createdBy !== null
+        ? invoice.createdBy.name ?? invoice.createdBy.email
+        : undefined
+
     const pdf = await generateSalesInvoicePDF(
       {
         number: invoice.invoiceNumber,
@@ -61,10 +70,15 @@ export async function GET(
         customerEmail: invoice.customerEmail ?? "",
         customerPhone: invoice.customerPhone ?? "",
         status: invoice.status,
+        processedBy,
         totalAmount: invoice.totalAmount,
         items,
       },
-      { name: "Prime Trade Company Ltd", address: "Kigali" }
+      {
+        name: "Prime Trade Company Ltd",
+        email: "Email: primetrade155@gmail.com",
+        phone: "Tel No: 0788746260",
+      }
     )
 
     return new NextResponse(new Uint8Array(pdf), {

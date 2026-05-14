@@ -29,6 +29,8 @@ type SalesPageSale = {
   updatedAt?: Date
   createdBy?: PopulatedSaleUser | { toString(): string }
   totalAmount: number
+  paymentStatus: "paid" | "unpaid"
+  paymentMethod: "cash" | "mobile-money" | "bank"
   notes: string
   items: SalesPageSaleItem[]
 }

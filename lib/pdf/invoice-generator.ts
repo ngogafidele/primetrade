@@ -38,6 +38,7 @@ type PdfDocumentData = {
   customerEmail?: string
   customerPhone?: string
   status?: string
+  processedBy?: string
   totalAmount: number
   items: PdfItem[]
 }
@@ -81,11 +82,10 @@ const logoBox = {
 }
 
 const businessFooterLines = [
-  "Equity Bank Account: 4005201187639",
-  "Tin: 111049695",
-  "Tel No: 0788399098",
-  "",
-  "Prime Trade Company Ltd",
+  "Payements methods",
+  "Equity Bank Account: 4014201273279",
+  "Momo Pay: 77876",
+  "Momo Pay Name: Prime Trade Company",
 ]
 
 function getLogoBuffer() {
@@ -177,8 +177,17 @@ function writeInvoicePdf(
     .text(data.number, 340, 88, { align: "right" })
     .text(`Date: ${formatDate(data.date)}`, 340, 104, { align: "right" })
 
+  let metaLine = 104
+
   if (data.status) {
     doc.text(`Status: ${data.status}`, 340, 120, { align: "right" })
+    metaLine = 120
+  }
+
+  if (data.processedBy) {
+    doc.text(`Processed by: ${data.processedBy}`, 340, metaLine + 16, {
+      align: "right",
+    })
   }
 
   doc

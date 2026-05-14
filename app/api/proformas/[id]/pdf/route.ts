@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { requireAuth } from "@/lib/auth/middleware"
 import { Proforma } from "@/lib/db/models/Proforma"
+import "@/lib/db/models/User"
 import { generateProformaPDF } from "@/lib/pdf/invoice-generator"
 
 export const runtime = "nodejs"
@@ -21,7 +22,10 @@ export async function GET(
 
     const { id } = await context.params
     await connectToDatabase()
-    const proforma = await Proforma.findById(id)
+    const proforma = await Proforma.findById(id).populate(
+      "createdBy",
+      "name email"
+    )
 
     if (!proforma) {
       return NextResponse.json(
@@ -30,6 +34,11 @@ export async function GET(
       )
     }
 
+    const processedBy =
+      typeof proforma.createdBy === "object" && proforma.createdBy !== null
+        ? proforma.createdBy.name ?? proforma.createdBy.email
+        : undefined
+
     const pdf = await generateProformaPDF(
       {
         number: proforma.proformaNumber,
@@ -37,6 +46,7 @@ export async function GET(
         customerName: proforma.customerName,
         customerEmail: proforma.customerEmail ?? "",
         customerPhone: proforma.customerPhone ?? "",
+        processedBy,
         totalAmount: proforma.totalAmount,
         items: (proforma.items ?? []).map((item) => ({
           description: item.description,
@@ -46,7 +56,11 @@ export async function GET(
           lineTotal: item.lineTotal,
         })),
       },
-      { name: "Prime Trade Company Ltd", address: "Kigali" }
+      {
+        name: "Prime Trade Company Ltd",
+        email: "Email: primetrade155@gmail.com",
+        phone: "Tel No: 0788746260",
+      }
     )
 
     return new NextResponse(new Uint8Array(pdf), {

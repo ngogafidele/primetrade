@@ -3,8 +3,22 @@
 import { Fragment, useEffect, useMemo, useState } from "react"
 import { formatCurrency } from "@/lib/utils/format"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { ProductSearchSelect } from "@/components/products/product-search-select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -38,11 +52,15 @@ type SaleClient = {
   _id: string
   items: SaleItemClient[]
   totalAmount: number
+  paymentStatus: "paid" | "unpaid"
+  paymentMethod: "cash" | "mobile-money" | "bank"
   notes: string
   createdByName?: string
   createdAtLabel?: string
   createdAt?: string
 }
+
+type InvoiceStatus = "paid" | "unpaid"
 
 type DraftItem = {
   productId: string
@@ -57,6 +75,12 @@ const emptyDraft: DraftItem = {
 }
 
 const SALES_PER_PAGE = 20
+const defaultInvoiceForm = {
+  customerName: "",
+  customerEmail: "",
+  customerPhone: "",
+  status: "unpaid" as InvoiceStatus,
+}
 
 export function SalesManager({
   initialSales,
@@ -70,9 +94,19 @@ export function SalesManager({
   const [sales, setSales] = useState(initialSales)
   const [draftItems, setDraftItems] = useState<DraftItem[]>([emptyDraft])
   const [notes, setNotes] = useState("")
+  const [paymentStatus, setPaymentStatus] = useState<InvoiceStatus>("paid")
+  const [paymentMethod, setPaymentMethod] = useState<
+    "cash" | "mobile-money" | "bank"
+  >("cash")
   const [error, setError] = useState<string | null>(null)
+  const [invoiceError, setInvoiceError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [invoiceSubmitting, setInvoiceSubmitting] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
+  const [activeInvoiceSale, setActiveInvoiceSale] = useState<SaleClient | null>(null)
+  const [invoiceForm, setInvoiceForm] = useState(defaultInvoiceForm)
+  const [invoicedSaleIds, setInvoicedSaleIds] = useState<string[]>([])
 
   const productMap = useMemo(
     () => new Map(products.map((product) => [product._id, product])),
@@ -91,6 +125,21 @@ export function SalesManager({
       setCurrentPage(pageCount)
     }
   }, [currentPage, pageCount])
+
+  useEffect(() => {
+    async function loadInvoices() {
+      const response = await fetch("/api/sales-invoices")
+      const body = await response.json()
+      if (response.ok && body?.success) {
+        const saleIds = body.data
+          .map((invoice: { saleId?: string }) => invoice.saleId?.toString())
+          .filter(Boolean) as string[]
+        setInvoicedSaleIds(saleIds)
+      }
+    }
+
+    loadInvoices().catch(() => null)
+  }, [])
 
   const setDraftItem = (
     index: number,
@@ -119,7 +168,19 @@ export function SalesManager({
   const resetForm = () => {
     setDraftItems([emptyDraft])
     setNotes("")
+    setPaymentStatus("paid")
+    setPaymentMethod("cash")
     setError(null)
+  }
+
+  const openInvoiceDialog = (sale: SaleClient) => {
+    setInvoiceError(null)
+    setActiveInvoiceSale(sale)
+    setInvoiceForm({
+      ...defaultInvoiceForm,
+      status: sale.paymentStatus,
+    })
+    setInvoiceDialogOpen(true)
   }
 
   const getItemLabel = (item: SaleItemClient) => {
@@ -179,6 +240,8 @@ export function SalesManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: payloadItems,
+          paymentStatus,
+          paymentMethod,
           notes: notes.trim(),
         }),
       })
@@ -190,7 +253,14 @@ export function SalesManager({
       }
 
       const createdSale = body.data as SaleClient
-      setSales((current) => [createdSale, ...current])
+      setSales((current) => [
+        {
+          ...createdSale,
+          paymentStatus: createdSale.paymentStatus ?? paymentStatus,
+          paymentMethod: createdSale.paymentMethod ?? paymentMethod,
+        },
+        ...current,
+      ])
       setCurrentPage(1)
       resetForm()
     } catch {
@@ -199,6 +269,67 @@ export function SalesManager({
       setSubmitting(false)
     }
   }
+
+  const submitInvoice = async () => {
+    if (!activeInvoiceSale) return
+
+    if (!invoiceForm.customerName.trim()) {
+      setInvoiceError("Customer name is required.")
+      return
+    }
+
+    setInvoiceSubmitting(true)
+    setInvoiceError(null)
+
+    try {
+      const response = await fetch("/api/sales-invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          saleId: activeInvoiceSale._id,
+          customerName: invoiceForm.customerName.trim(),
+          customerEmail: invoiceForm.customerEmail.trim() || undefined,
+          customerPhone: invoiceForm.customerPhone.trim() || undefined,
+          status: invoiceForm.status,
+        }),
+      })
+
+      const body = await response.json().catch(() => null)
+      if (!response.ok || !body?.success) {
+        setInvoiceError(body?.error ?? "Failed to create invoice.")
+        return
+      }
+
+      setInvoicedSaleIds((current) =>
+        current.includes(activeInvoiceSale._id)
+          ? current
+          : [activeInvoiceSale._id, ...current]
+      )
+      setInvoiceDialogOpen(false)
+      setActiveInvoiceSale(null)
+      setInvoiceForm(defaultInvoiceForm)
+    } catch {
+      setInvoiceError("Failed to create invoice.")
+    } finally {
+      setInvoiceSubmitting(false)
+    }
+  }
+
+  const paymentStatusLabel = (status: InvoiceStatus) =>
+    status === "paid" ? "Paid" : "Unpaid"
+
+  const paymentMethodLabel = (
+    method: "cash" | "mobile-money" | "bank"
+  ) => {
+    if (method === "mobile-money") return "Mobile Money"
+    if (method === "bank") return "Bank"
+    return "Cash"
+  }
+
+  const invoicedSaleIdSet = useMemo(
+    () => new Set(invoicedSaleIds),
+    [invoicedSaleIds]
+  )
 
   return (
     <div className="space-y-5">
@@ -292,12 +423,49 @@ export function SalesManager({
           </Button>
         </div>
 
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
+          <label className="grid gap-1 text-sm">
+            Payment Status
+            <Select
+              value={paymentStatus}
+              onValueChange={(value) => setPaymentStatus(value as InvoiceStatus)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="unpaid">Unpaid</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            Payment Method
+            <Select
+              value={paymentMethod}
+              onValueChange={(value) =>
+                setPaymentMethod(value as "cash" | "mobile-money" | "bank")
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="mobile-money">Mobile Money</SelectItem>
+                <SelectItem value="bank">Bank</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+        </div>
+
         <label className="grid gap-1 text-sm">
           Notes (optional)
           <textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
-            className="min-h-[80px] rounded-md border border-border px-3 py-2"
+            className="min-h-20 rounded-md border border-border px-3 py-2"
             placeholder="Any note for this sale"
           />
         </label>
@@ -318,13 +486,16 @@ export function SalesManager({
             <TableHead>Cost Price</TableHead>
             <TableHead>Sold Price</TableHead>
             <TableHead>Total</TableHead>
+            <TableHead>Payment</TableHead>
+            <TableHead>Method</TableHead>
             <TableHead>Logged By</TableHead>
+            <TableHead className="text-right">Invoice</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {paginatedSales.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-muted-foreground">
+              <TableCell colSpan={9} className="text-muted-foreground">
                 No sales recorded yet.
               </TableCell>
             </TableRow>
@@ -352,7 +523,7 @@ export function SalesManager({
                         </TableCell>
                       ) : null}
                       <TableCell>
-                        <div className="whitespace-normal break-words">
+                        <div className="whitespace-normal wrap-break-word">
                           <p className="font-medium">{getItemLabel(item)}</p>
                           {item.sku ? (
                             <p className="text-xs text-muted-foreground">
@@ -372,7 +543,25 @@ export function SalesManager({
                             {formatCurrency(sale.totalAmount)}
                           </TableCell>
                           <TableCell rowSpan={rowSpan}>
+                            {paymentStatusLabel(sale.paymentStatus)}
+                          </TableCell>
+                          <TableCell rowSpan={rowSpan}>
+                            {paymentMethodLabel(sale.paymentMethod)}
+                          </TableCell>
+                          <TableCell rowSpan={rowSpan}>
                             {sale.createdByName ?? "Unknown User"}
+                          </TableCell>
+                          <TableCell rowSpan={rowSpan} className="text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openInvoiceDialog(sale)}
+                              disabled={invoicedSaleIdSet.has(sale._id)}
+                            >
+                              {invoicedSaleIdSet.has(sale._id)
+                                ? "Invoiced"
+                                : "Create Invoice"}
+                            </Button>
                           </TableCell>
                         </>
                       ) : null}
@@ -412,6 +601,114 @@ export function SalesManager({
           </Button>
         </div>
       </div>
+
+      <Dialog
+        open={invoiceDialogOpen}
+        onOpenChange={(open) => {
+          setInvoiceDialogOpen(open)
+          if (!open) {
+            setInvoiceError(null)
+            setActiveInvoiceSale(null)
+            setInvoiceForm(defaultInvoiceForm)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Invoice</DialogTitle>
+          </DialogHeader>
+
+          {activeInvoiceSale ? (
+            <div className="rounded-lg border border-border/80 bg-muted/40 p-3 text-sm">
+              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                Sale Summary
+              </p>
+              <p className="mt-1 font-semibold">
+                Total: {formatCurrency(activeInvoiceSale.totalAmount)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Payment: {paymentStatusLabel(activeInvoiceSale.paymentStatus)} • {paymentMethodLabel(activeInvoiceSale.paymentMethod)}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="grid gap-3">
+            <label className="grid gap-1 text-sm">
+              Customer Name
+              <Input
+                value={invoiceForm.customerName}
+                onChange={(event) =>
+                  setInvoiceForm((current) => ({
+                    ...current,
+                    customerName: event.target.value,
+                  }))
+                }
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm">
+              Customer Email (optional)
+              <Input
+                type="email"
+                value={invoiceForm.customerEmail}
+                onChange={(event) =>
+                  setInvoiceForm((current) => ({
+                    ...current,
+                    customerEmail: event.target.value,
+                  }))
+                }
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm">
+              Customer Phone (optional)
+              <Input
+                value={invoiceForm.customerPhone}
+                onChange={(event) =>
+                  setInvoiceForm((current) => ({
+                    ...current,
+                    customerPhone: event.target.value,
+                  }))
+                }
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm">
+              Invoice Status
+              <Select
+                value={invoiceForm.status}
+                onValueChange={(value) =>
+                  setInvoiceForm((current) => ({
+                    ...current,
+                    status: value as InvoiceStatus,
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="unpaid">Unpaid</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          </div>
+
+          {invoiceError ? (
+            <p className="text-sm text-destructive">{invoiceError}</p>
+          ) : null}
+
+          <DialogFooter>
+            <Button
+              onClick={submitInvoice}
+              disabled={invoiceSubmitting || !activeInvoiceSale}
+            >
+              {invoiceSubmitting ? "Creating..." : "Create Invoice"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

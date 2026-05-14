@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { connection } from "next/server"
 import { requireServerSession } from "@/lib/auth/server"
 import { connectToDatabase } from "@/lib/db/connection"
+import { Expense } from "@/lib/db/models/Expense"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Product } from "@/lib/db/models/Product"
 import { Sale } from "@/lib/db/models/Sale"
@@ -27,12 +28,15 @@ import {
 
 type ReportSummary = {
   products: number
-  lowStock: number
   inventoryCost: number
   inventoryRetail: number
   sales: number
   revenue: number
   grossProfit: number
+  expenses: number
+  revenueCash: number
+  revenueMobileMoney: number
+  revenueBank: number
   invoices: number
   unpaidInvoices: number
   outstanding: number
@@ -47,10 +51,14 @@ type SaleTotals = {
   unitsSold: number
 }
 
+type PaymentMethodTotals = {
+  _id: "cash" | "mobile-money" | "bank"
+  total: number
+}
+
 type ProductTotals = {
   _id: null
   products: number
-  lowStock: number
   inventoryCost: number
   inventoryRetail: number
 }
@@ -65,6 +73,11 @@ type InvoiceTotals = {
 type AdjustmentTotals = {
   _id: null
   adjustments: number
+}
+
+type ExpenseTotals = {
+  _id: null
+  expenses: number
 }
 
 type SearchParams = Promise<{
@@ -172,12 +185,15 @@ function sumReports(reports: ReportSummary[]) {
   return reports.reduce(
     (total, report) => ({
       products: total.products + report.products,
-      lowStock: total.lowStock + report.lowStock,
       inventoryCost: total.inventoryCost + report.inventoryCost,
       inventoryRetail: total.inventoryRetail + report.inventoryRetail,
       sales: total.sales + report.sales,
       revenue: total.revenue + report.revenue,
       grossProfit: total.grossProfit + report.grossProfit,
+      expenses: total.expenses + report.expenses,
+      revenueCash: total.revenueCash + report.revenueCash,
+      revenueMobileMoney: total.revenueMobileMoney + report.revenueMobileMoney,
+      revenueBank: total.revenueBank + report.revenueBank,
       invoices: total.invoices + report.invoices,
       unpaidInvoices: total.unpaidInvoices + report.unpaidInvoices,
       outstanding: total.outstanding + report.outstanding,
@@ -185,12 +201,15 @@ function sumReports(reports: ReportSummary[]) {
     }),
     {
       products: 0,
-      lowStock: 0,
       inventoryCost: 0,
       inventoryRetail: 0,
       sales: 0,
       revenue: 0,
       grossProfit: 0,
+      expenses: 0,
+      revenueCash: 0,
+      revenueMobileMoney: 0,
+      revenueBank: 0,
       invoices: 0,
       unpaidInvoices: 0,
       outstanding: 0,
@@ -222,6 +241,8 @@ export default async function ReportsPage({
     saleTotals,
     invoiceTotals,
     adjustmentTotals,
+    expenseTotals,
+    paymentTotals,
     topMovingProducts,
     recentSales,
   ] = await Promise.all([
@@ -231,15 +252,6 @@ export default async function ReportsPage({
         $group: {
           _id: null,
           products: { $sum: 1 },
-          lowStock: {
-            $sum: {
-              $cond: [
-                { $lte: ["$quantity", { $ifNull: ["$lowStockThreshold", 0] }] },
-                1,
-                0,
-              ],
-            },
-          },
           inventoryCost: {
             $sum: { $multiply: ["$quantity", "$costPrice"] },
           },
@@ -303,6 +315,38 @@ export default async function ReportsPage({
         },
       },
     ]),
+    Expense.aggregate<ExpenseTotals>([
+      {
+        $match: {
+          $or: [
+            { incurredAt: periodFilter },
+            { incurredAt: { $exists: false }, createdAt: periodFilter },
+            { incurredAt: null, createdAt: periodFilter },
+          ],
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          expenses: { $sum: "$amount" },
+        },
+      },
+    ]),
+    Sale.aggregate<PaymentMethodTotals>([
+      {
+        $match: {
+          createdAt: periodFilter,
+          paymentStatus: "paid",
+          paymentMethod: { $in: ["cash", "mobile-money", "bank"] },
+        },
+      },
+      {
+        $group: {
+          _id: "$paymentMethod",
+          total: { $sum: "$totalAmount" },
+        },
+      },
+    ]),
     Sale.aggregate<TopMovingProduct>([
       { $match: { createdAt: periodFilter } },
       { $unwind: "$items" },
@@ -348,12 +392,17 @@ export default async function ReportsPage({
 
   const report: ReportSummary = {
     products: productTotals[0]?.products ?? 0,
-    lowStock: productTotals[0]?.lowStock ?? 0,
     inventoryCost: productTotals[0]?.inventoryCost ?? 0,
     inventoryRetail: productTotals[0]?.inventoryRetail ?? 0,
     sales: saleTotals[0]?.sales ?? 0,
     revenue: saleTotals[0]?.revenue ?? 0,
     grossProfit: saleTotals[0]?.grossProfit ?? 0,
+    expenses: expenseTotals[0]?.expenses ?? 0,
+    revenueCash: paymentTotals.find((entry) => entry._id === "cash")?.total ?? 0,
+    revenueMobileMoney:
+      paymentTotals.find((entry) => entry._id === "mobile-money")?.total ?? 0,
+    revenueBank:
+      paymentTotals.find((entry) => entry._id === "bank")?.total ?? 0,
     invoices: invoiceTotals[0]?.invoices ?? 0,
     unpaidInvoices: invoiceTotals[0]?.unpaidInvoices ?? 0,
     outstanding: invoiceTotals[0]?.outstanding ?? 0,
@@ -379,13 +428,22 @@ export default async function ReportsPage({
 
   const cards = [
     { label: "Total Revenue", value: formatCurrency(totals.revenue) },
-    { label: "Gross Profit", value: formatCurrency(totals.grossProfit) },
+    {
+      label: "Profit",
+      value: formatCurrency(totals.grossProfit - totals.expenses),
+    },
+    { label: "Expenses", value: formatCurrency(totals.expenses) },
     { label: "Inventory Cost", value: formatCurrency(totals.inventoryCost) },
     { label: "Inventory Retail", value: formatCurrency(totals.inventoryRetail) },
     { label: "Sales Records", value: formatNumber(totals.sales) },
     { label: "Products", value: formatNumber(totals.products) },
-    { label: "Low Stock", value: formatNumber(totals.lowStock) },
     { label: "Outstanding", value: formatCurrency(totals.outstanding) },
+  ]
+
+  const paymentCards = [
+    { label: "Cash", value: formatCurrency(totals.revenueCash) },
+    { label: "Mobile Money", value: formatCurrency(totals.revenueMobileMoney) },
+    { label: "Bank", value: formatCurrency(totals.revenueBank) },
   ]
 
   return (
@@ -447,6 +505,30 @@ export default async function ReportsPage({
       <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Payment Breakdown
+          </p>
+          <h3 className="text-lg font-semibold">Revenue by Method</h3>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          {paymentCards.map((card) => (
+            <div
+              key={card.label}
+              className="rounded-2xl border border-border/80 bg-background/80 p-4 shadow-sm"
+            >
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                {card.label}
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">
+                {card.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Summary
           </p>
           <h3 className="text-lg font-semibold">Performance</h3>
@@ -455,10 +537,13 @@ export default async function ReportsPage({
           <TableHeader>
             <TableRow>
               <TableHead>Revenue</TableHead>
-              <TableHead>Gross Profit</TableHead>
+              <TableHead>Profit</TableHead>
+              <TableHead>Expenses</TableHead>
+              <TableHead>Cash</TableHead>
+              <TableHead>Mobile Money</TableHead>
+              <TableHead>Bank</TableHead>
               <TableHead>Sales</TableHead>
               <TableHead>Products</TableHead>
-              <TableHead>Low Stock</TableHead>
               <TableHead>Outstanding</TableHead>
             </TableRow>
           </TableHeader>
@@ -466,10 +551,15 @@ export default async function ReportsPage({
             {reports.map((report, index) => (
               <TableRow key={index}>
                 <TableCell>{formatCurrency(report.revenue)}</TableCell>
-                <TableCell>{formatCurrency(report.grossProfit)}</TableCell>
+                <TableCell>
+                  {formatCurrency(report.grossProfit - report.expenses)}
+                </TableCell>
+                <TableCell>{formatCurrency(report.expenses)}</TableCell>
+                <TableCell>{formatCurrency(report.revenueCash)}</TableCell>
+                <TableCell>{formatCurrency(report.revenueMobileMoney)}</TableCell>
+                <TableCell>{formatCurrency(report.revenueBank)}</TableCell>
                 <TableCell>{formatNumber(report.sales)}</TableCell>
                 <TableCell>{formatNumber(report.products)}</TableCell>
-                <TableCell>{formatNumber(report.lowStock)}</TableCell>
                 <TableCell>{formatCurrency(report.outstanding)}</TableCell>
               </TableRow>
             ))}
@@ -550,7 +640,7 @@ export default async function ReportsPage({
                   <TableRow key={sale._id.toString()}>
                     <TableCell>{formatDateTime(sale.createdAt)}</TableCell>
                     <TableCell>
-                      <span className="whitespace-normal break-words">
+                      <span className="whitespace-normal wrap-break-word">
                         {sale.items
                           .map((item) => item.name || item.sku)
                           .join(", ")}

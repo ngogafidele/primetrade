@@ -133,6 +133,8 @@ export async function POST(request: NextRequest) {
       sale = await Sale.create({
         items: saleItems,
         totalAmount,
+        paymentStatus: payload.paymentStatus,
+        paymentMethod: payload.paymentMethod,
         createdBy: session.userId,
         notes: payload.notes ?? "",
       })

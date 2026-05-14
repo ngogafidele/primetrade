@@ -18,6 +18,17 @@ const SaleSchema = new Schema(
   {
     items: { type: [SaleItemSchema], required: true },
     totalAmount: { type: Number, required: true, min: 0 },
+    paymentStatus: {
+      type: String,
+      enum: ["paid", "unpaid"],
+      required: true,
+      default: "paid",
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["cash", "mobile-money", "bank"],
+      required: true,
+    },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     notes: { type: String, default: "" },
   },

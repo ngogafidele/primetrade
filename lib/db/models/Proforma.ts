@@ -18,6 +18,7 @@ const ProformaSchema = new Schema(
     customerName: { type: String, required: true, trim: true },
     customerEmail: { type: String, default: "", trim: true },
     customerPhone: { type: String, default: "", trim: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
     items: { type: [ProformaItemSchema], required: true },
     totalAmount: { type: Number, required: true, min: 0 },
     issuedAt: { type: Date, default: Date.now },

@@ -25,6 +25,7 @@ const InvoiceSchema = new Schema(
     customerName: { type: String, required: true },
     customerEmail: { type: String, default: "" },
     customerPhone: { type: String, default: "" },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
     items: { type: [InvoiceItemSchema], default: [] },
     totalAmount: { type: Number, required: true, min: 0 },
     status: {

@@ -423,8 +423,10 @@ export function InvoicesManager({
               }
             </div>
             <div class="panel">
-              <h2>Sale Reference</h2>
-              <p>${escapeHtml(sale?.label ?? invoice.saleId)}</p>
+              <h2>Prime Trade Company Ltd</h2>
+              <p>Email: primetrade155@gmail.com</p>
+              <p>Tel No: 0788746260</p>
+              <p>Sale Ref: ${escapeHtml(sale?.label ?? invoice.saleId)}</p>
             </div>
           </section>
 
@@ -449,6 +451,15 @@ export function InvoicesManager({
                 <span>Total</span>
                 <span>${escapeHtml(formatCurrency(invoice.totalAmount))}</span>
               </strong>
+            </div>
+          </section>
+
+          <section class="total">
+            <div>
+              <p style="margin: 0 0 8px; font-size: 12px; color: #52627a;">Payements methods</p>
+              <p style="margin: 0; font-size: 12px; color: #52627a;">Equity Bank Account: 4014201273279</p>
+              <p style="margin: 0; font-size: 12px; color: #52627a;">Momo Pay: 77876</p>
+              <p style="margin: 0; font-size: 12px; color: #52627a;">Momo Pay Name: Prime Trade Company</p>
             </div>
           </section>
 
