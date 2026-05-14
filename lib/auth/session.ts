@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server"
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies"
 
 export const AUTH_COOKIE = "auth"
-export const ADMIN_IDLE_TIMEOUT_SECONDS = 10 * 60
+export const ADMIN_IDLE_TIMEOUT_SECONDS = 1 * 60 * 60
 export const STAFF_IDLE_TIMEOUT_SECONDS = 6 * 60 * 60
 
 const JWT_SECRET = process.env.JWT_SECRET
