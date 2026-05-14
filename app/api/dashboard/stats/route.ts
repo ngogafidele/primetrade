@@ -5,6 +5,7 @@ import { Product } from "@/lib/db/models/Product"
 import { Sale } from "@/lib/db/models/Sale"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Expense } from "@/lib/db/models/Expense"
+import { getKigaliDateParts } from "@/lib/utils/time"
 
 type DashboardSaleItem = {
   quantity: number
@@ -46,9 +47,11 @@ type DashboardTopMovingProduct = {
 }
 
 function getTodayRange() {
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-
+  const now = new Date()
+  const parts = getKigaliDateParts(now)
+  const utcMidnight = Date.UTC(parts.year, parts.month - 1, parts.day, 0, 0, 0, 0)
+  // Kigali stays on CAT (UTC+2) year-round.
+  const start = new Date(utcMidnight - 2 * 60 * 60 * 1000)
   const end = new Date(start)
   end.setDate(end.getDate() + 1)
 
