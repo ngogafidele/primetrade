@@ -1,31 +1,30 @@
 "use client"
 
-import { useState, useTransition } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { KeyRound, ShieldCheck } from "lucide-react"
+import { ArrowRight, KeyRound, LockKeyhole, Mail, PackageCheck } from "lucide-react"
+import { type FormEvent, useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 export default function Home() {
   const router = useRouter()
-  const [loginEmail, setLoginEmail] = useState("")
-  const [loginPassword, setLoginPassword] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const handleLogin = () => {
+  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
     setMessage(null)
+
     startTransition(async () => {
       try {
         const response = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: loginEmail,
-            password: loginPassword,
-          }),
+          body: JSON.stringify({ email, password }),
         })
 
         const data = await response.json()
@@ -48,89 +47,116 @@ export default function Home() {
       <div className="pointer-events-none absolute right-0 top-24 size-80 rounded-full bg-red-500/20 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 left-1/3 size-72 rounded-full bg-amber-400/20 blur-3xl" />
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-10 lg:py-16">
-        <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-          <section className="space-y-6">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="flex size-20 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/90 p-2 shadow-[0_18px_45px_-30px_rgba(30,64,175,0.75)]">
-                <Image
-                  src="/images/logo.png"
-                  alt="Prime Trade logo"
-                  width={72}
-                  height={72}
-                  className="h-full w-full object-contain"
-                  priority
+      <main className="mx-auto grid min-h-screen max-w-6xl items-center gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-10">
+        <section className="order-2 space-y-8 lg:order-1">
+          <div className="flex items-center gap-4">
+            <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/70 bg-white/90 p-2 shadow-[0_18px_45px_-30px_rgba(30,64,175,0.75)]">
+              <Image
+                src="/images/logo.png"
+                alt="Prime Trade logo"
+                width={80}
+                height={80}
+                priority
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Prime Trade Company Ltd Inventory
+              </p>
+              <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">
+                Sign in to the operations hub.
+              </h1>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              "Live stock visibility",
+              "Sales tracking",
+              "Alerted replenishment",
+            ].map((item) => (
+              <div
+                key={item}
+                className="rounded-lg border border-border/80 bg-white/70 p-4 text-sm font-medium text-foreground shadow-sm"
+              >
+                <PackageCheck className="mb-3 size-5 text-primary" />
+                {item}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="order-1 rounded-xl border border-border/80 bg-card p-5 shadow-xl sm:p-7 lg:order-2">
+          <div className="mb-6">
+            <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <KeyRound className="size-5" />
+            </div>
+            <h2 className="text-2xl font-semibold text-foreground">Sign in</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Use your staff or admin account to continue to the dashboard.
+            </p>
+          </div>
+
+          {message ? (
+            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              {message}
+            </div>
+          ) : null}
+
+          <form className="space-y-4" onSubmit={handleLogin}>
+            <label className="block space-y-2 text-sm font-medium text-foreground">
+              Email or username
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="h-11 pl-9"
+                  placeholder="Email or username"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  type="text"
+                  autoComplete="username"
+                  required
                 />
               </div>
-              <div className="space-y-2">
-                <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                  Prime Trade Company Ltd Inventory
-                </p>
-                <h1 className="text-4xl font-semibold leading-tight sm:text-5xl">
-                  Sign in to the operations hub
-                </h1>
+            </label>
+            <label className="block space-y-2 text-sm font-medium text-foreground">
+              Password
+              <div className="relative">
+                <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="h-11 pl-9"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                />
               </div>
-            </div>
-            <p className="max-w-xl text-sm text-muted-foreground">
-              Keep inventory, sales, and reporting in sync across your team. Sign in to continue, or complete the one-time admin setup to get started.
+            </label>
+
+            <Button className="h-11 w-full" disabled={isPending}>
+              {isPending ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
+
+          <div className="mt-6 border-t border-border pt-5">
+            <p className="text-sm text-muted-foreground">
+              Setting up the system for the first time?
             </p>
-            <div className="flex flex-wrap gap-3">
-              <span className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-700">
-                Live stock visibility
-              </span>
-              <span className="inline-flex items-center rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-700">
-                Sales tracking
-              </span>
-              <span className="inline-flex items-center rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-700">
-                Alerted replenishment
-              </span>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-border/70 bg-white/80 p-6 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.6)] backdrop-blur">
-            <div className="mb-4 flex items-center gap-2">
-              <KeyRound className="size-4 text-primary" />
-              <h2 className="text-lg font-semibold">Login</h2>
-            </div>
-            <p className="text-sm text-muted-foreground">Access daily operations.</p>
-            <div className="mt-4 space-y-3">
-              <Input
-                placeholder="Email or username"
-                value={loginEmail}
-                onChange={(event) => setLoginEmail(event.target.value)}
-                type="text"
-              />
-              <Input
-                placeholder="Password"
-                value={loginPassword}
-                onChange={(event) => setLoginPassword(event.target.value)}
-                type="password"
-              />
-              <Button onClick={handleLogin} disabled={isPending} className="w-full">
-                Sign in
-              </Button>
-            </div>
-
-            {message ? (
-              <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                {message}
-              </div>
-            ) : null}
-
-            <div className="mt-5 rounded-xl border border-border/60 bg-muted/40 p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <ShieldCheck className="size-4 text-primary" />
-                <p className="text-sm font-medium">First time setup</p>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Create the initial admin account before the first login.
-              </p>
-              <Button asChild variant="secondary" size="lg" className="mt-3 w-full">
-                <Link href="/setup-admin">Get Started</Link>
-              </Button>
-            </div>
-          </section>
-        </div>
+            <Button
+              asChild
+              variant="secondary"
+              className="mt-3 h-11 w-full border border-primary bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              <Link href="/setup-admin">
+                Get Started
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+        </section>
       </main>
     </div>
   )

@@ -117,11 +117,11 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    if (Math.abs(totalReturnAmount - totalReplacementAmount) > TOTAL_TOLERANCE) {
+    if (totalReplacementAmount - totalReturnAmount > TOTAL_TOLERANCE) {
       return NextResponse.json(
         {
           success: false,
-          error: "Return and replacement totals must match.",
+          error: "Replacement total cannot exceed the return total.",
         },
         { status: 400 }
       )

@@ -138,7 +138,6 @@ export function ReportPrintButton({
       hour: "2-digit",
       minute: "2-digit",
     })
-    const outstandingClass = totals.outstanding > 0 ? "metric warning" : "metric"
     const outstandingSalesClass =
       totals.outstandingSales > 0 ? "metric warning" : "metric"
     const expenseClass = totals.expenses > 0 ? "metric warning" : "metric"
@@ -156,7 +155,6 @@ export function ReportPrintButton({
             <td>${escapeHtml(formatNumber(report.sales))}</td>
             <td>${escapeHtml(formatNumber(report.products))}</td>
             <td>${escapeHtml(formatCurrency(report.outstandingSales))}</td>
-            <td>${escapeHtml(formatCurrency(report.outstanding))}</td>
           </tr>
         `
       )
@@ -377,7 +375,6 @@ export function ReportPrintButton({
             <div class="metric"><span>Sales Records</span><strong>${escapeHtml(formatNumber(totals.sales))}</strong></div>
             <div class="metric"><span>Products</span><strong>${escapeHtml(formatNumber(totals.products))}</strong></div>
             <div class="${outstandingSalesClass}"><span>Outstanding Sales</span><strong>${escapeHtml(formatCurrency(totals.outstandingSales))}</strong></div>
-            <div class="${outstandingClass}"><span>Outstanding Invoices</span><strong>${escapeHtml(formatCurrency(totals.outstanding))}</strong></div>
           </div>
 
           <div class="section-grid">
@@ -395,11 +392,10 @@ export function ReportPrintButton({
                     <th>Sales</th>
                     <th>Products</th>
                     <th>Outstanding Sales</th>
-                    <th>Outstanding Invoices</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${summaryRows || '<tr><td colspan="10">No summary data found.</td></tr>'}
+                  ${summaryRows || '<tr><td colspan="9">No summary data found.</td></tr>'}
                 </tbody>
               </table>
             </section>

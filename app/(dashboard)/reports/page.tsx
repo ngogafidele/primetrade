@@ -465,10 +465,6 @@ export default async function ReportsPage({
       label: "Outstanding Sales",
       value: formatCurrency(totals.outstandingSales),
     },
-    {
-      label: "Outstanding Invoices",
-      value: formatCurrency(totals.outstanding),
-    },
   ]
 
   const paymentCards = [

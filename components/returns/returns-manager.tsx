@@ -152,8 +152,8 @@ export function ReturnsManager({
 
   const returnTotal = computeTotal(returnDraftItems)
   const replacementTotal = computeTotal(replacementDraftItems)
-  const totalsMatch =
-    Math.abs(returnTotal - replacementTotal) <= TOTAL_TOLERANCE
+  const replacementWithinReturn =
+    replacementTotal - returnTotal <= TOTAL_TOLERANCE
 
   const getItemLabel = (item: ReturnItemClient) => {
     return item.name?.trim() || item.sku?.trim() || "Unnamed item"
@@ -204,8 +204,8 @@ export function ReturnsManager({
       return
     }
 
-    if (!totalsMatch) {
-      setError("Return and replacement totals must match.")
+    if (!replacementWithinReturn) {
+      setError("Replacement total cannot exceed the return total.")
       return
     }
 
@@ -428,12 +428,14 @@ export function ReturnsManager({
             <p className="text-xs text-muted-foreground">Status</p>
             <p
               className={
-                totalsMatch
+                replacementWithinReturn
                   ? "text-base font-semibold text-emerald-600"
                   : "text-base font-semibold text-destructive"
               }
             >
-              {totalsMatch ? "Totals match" : "Totals mismatch"}
+              {replacementWithinReturn
+                ? "Replacement within return"
+                : "Replacement exceeds return"}
             </p>
           </div>
         </div>
