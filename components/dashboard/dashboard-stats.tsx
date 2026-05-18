@@ -31,6 +31,7 @@ type StatsResponse = {
   revenueToday: number
   grossProfitToday: number
   expensesToday: number
+  returnCostToday: number
   lowStockProducts: Array<{
     _id: string
     name: string
@@ -101,7 +102,9 @@ export function DashboardStats() {
     },
     {
       label: "Profit Today",
-      value: formatCurrency(stats.grossProfitToday - stats.expensesToday),
+      value: formatCurrency(
+        stats.grossProfitToday - stats.expensesToday + stats.returnCostToday
+      ),
       icon: TrendingUp,
     },
   ]

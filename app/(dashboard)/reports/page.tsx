@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { Expense } from "@/lib/db/models/Expense"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Product } from "@/lib/db/models/Product"
+import { ReturnTransaction } from "@/lib/db/models/Return"
 import { Sale } from "@/lib/db/models/Sale"
 import { StockAdjustment } from "@/lib/db/models/StockAdjustment"
 import { formatCurrency } from "@/lib/utils/format"
@@ -34,6 +35,7 @@ type ReportSummary = {
   revenue: number
   grossProfit: number
   expenses: number
+  returnCostImpact: number
   revenueCash: number
   revenueMobileMoney: number
   revenueBank: number
@@ -84,6 +86,12 @@ type OutstandingSalesTotals = {
 type ExpenseTotals = {
   _id: null
   expenses: number
+}
+
+type ReturnCostTotals = {
+  _id: null
+  returnCost: number
+  replacementCost: number
 }
 
 type SearchParams = Promise<{
@@ -197,6 +205,7 @@ function sumReports(reports: ReportSummary[]) {
       revenue: total.revenue + report.revenue,
       grossProfit: total.grossProfit + report.grossProfit,
       expenses: total.expenses + report.expenses,
+      returnCostImpact: total.returnCostImpact + report.returnCostImpact,
       revenueCash: total.revenueCash + report.revenueCash,
       revenueMobileMoney: total.revenueMobileMoney + report.revenueMobileMoney,
       revenueBank: total.revenueBank + report.revenueBank,
@@ -214,6 +223,7 @@ function sumReports(reports: ReportSummary[]) {
       revenue: 0,
       grossProfit: 0,
       expenses: 0,
+      returnCostImpact: 0,
       revenueCash: 0,
       revenueMobileMoney: 0,
       revenueBank: 0,
@@ -251,6 +261,7 @@ export default async function ReportsPage({
     adjustmentTotals,
     expenseTotals,
     outstandingSalesTotals,
+    returnCostTotals,
     paymentTotals,
     topMovingProducts,
     recentSales,
@@ -341,6 +352,74 @@ export default async function ReportsPage({
         },
       },
     ]),
+    ReturnTransaction.aggregate<ReturnCostTotals>([
+      { $match: { createdAt: periodFilter } },
+      {
+        $facet: {
+          returnCosts: [
+            { $unwind: "$returnItems" },
+            {
+              $lookup: {
+                from: "products",
+                localField: "returnItems.productId",
+                foreignField: "_id",
+                as: "product",
+              },
+            },
+            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+            {
+              $group: {
+                _id: null,
+                total: {
+                  $sum: {
+                    $multiply: [
+                      "$returnItems.quantity",
+                      { $ifNull: ["$product.costPrice", 0] },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+          replacementCosts: [
+            { $unwind: "$replacementItems" },
+            {
+              $lookup: {
+                from: "products",
+                localField: "replacementItems.productId",
+                foreignField: "_id",
+                as: "product",
+              },
+            },
+            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+            {
+              $group: {
+                _id: null,
+                total: {
+                  $sum: {
+                    $multiply: [
+                      "$replacementItems.quantity",
+                      { $ifNull: ["$product.costPrice", 0] },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      {
+        $project: {
+          _id: null,
+          returnCost: {
+            $ifNull: [{ $arrayElemAt: ["$returnCosts.total", 0] }, 0],
+          },
+          replacementCost: {
+            $ifNull: [{ $arrayElemAt: ["$replacementCosts.total", 0] }, 0],
+          },
+        },
+      },
+    ]),
     Sale.aggregate<OutstandingSalesTotals>([
       {
         $match: {
@@ -421,6 +500,9 @@ export default async function ReportsPage({
     revenue: saleTotals[0]?.revenue ?? 0,
     grossProfit: saleTotals[0]?.grossProfit ?? 0,
     expenses: expenseTotals[0]?.expenses ?? 0,
+    returnCostImpact:
+      (returnCostTotals[0]?.returnCost ?? 0) -
+      (returnCostTotals[0]?.replacementCost ?? 0),
     revenueCash: paymentTotals.find((entry) => entry._id === "cash")?.total ?? 0,
     revenueMobileMoney:
       paymentTotals.find((entry) => entry._id === "mobile-money")?.total ?? 0,
@@ -454,7 +536,9 @@ export default async function ReportsPage({
     { label: "Total Revenue", value: formatCurrency(totals.revenue) },
     {
       label: "Profit",
-      value: formatCurrency(totals.grossProfit - totals.expenses),
+      value: formatCurrency(
+        totals.grossProfit - totals.expenses + totals.returnCostImpact
+      ),
     },
     { label: "Expenses", value: formatCurrency(totals.expenses) },
     { label: "Inventory Cost", value: formatCurrency(totals.inventoryCost) },
@@ -580,7 +664,11 @@ export default async function ReportsPage({
               <TableRow key={index}>
                 <TableCell>{formatCurrency(report.revenue)}</TableCell>
                 <TableCell>
-                  {formatCurrency(report.grossProfit - report.expenses)}
+                  {formatCurrency(
+                    report.grossProfit -
+                      report.expenses +
+                      report.returnCostImpact
+                  )}
                 </TableCell>
                 <TableCell>{formatCurrency(report.expenses)}</TableCell>
                 <TableCell>{formatCurrency(report.revenueCash)}</TableCell>

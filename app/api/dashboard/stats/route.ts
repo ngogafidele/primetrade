@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth/middleware"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
+import { ReturnTransaction } from "@/lib/db/models/Return"
 import { Sale } from "@/lib/db/models/Sale"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Expense } from "@/lib/db/models/Expense"
@@ -145,6 +146,79 @@ export async function GET(request: NextRequest) {
       },
     ])
 
+    const todayReturnCosts = await ReturnTransaction.aggregate<{
+      _id: null
+      returnCost: number
+      replacementCost: number
+    }>([
+      { $match: { createdAt: { $gte: today.start, $lt: today.end } } },
+      {
+        $facet: {
+          returnCosts: [
+            { $unwind: "$returnItems" },
+            {
+              $lookup: {
+                from: "products",
+                localField: "returnItems.productId",
+                foreignField: "_id",
+                as: "product",
+              },
+            },
+            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+            {
+              $group: {
+                _id: null,
+                total: {
+                  $sum: {
+                    $multiply: [
+                      "$returnItems.quantity",
+                      { $ifNull: ["$product.costPrice", 0] },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+          replacementCosts: [
+            { $unwind: "$replacementItems" },
+            {
+              $lookup: {
+                from: "products",
+                localField: "replacementItems.productId",
+                foreignField: "_id",
+                as: "product",
+              },
+            },
+            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+            {
+              $group: {
+                _id: null,
+                total: {
+                  $sum: {
+                    $multiply: [
+                      "$replacementItems.quantity",
+                      { $ifNull: ["$product.costPrice", 0] },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      {
+        $project: {
+          _id: null,
+          returnCost: {
+            $ifNull: [{ $arrayElemAt: ["$returnCosts.total", 0] }, 0],
+          },
+          replacementCost: {
+            $ifNull: [{ $arrayElemAt: ["$replacementCosts.total", 0] }, 0],
+          },
+        },
+      },
+    ])
+
     const todayExpenses = await Expense.aggregate<DashboardMoneyTotal>([
       {
         $match: {
@@ -204,6 +278,9 @@ export async function GET(request: NextRequest) {
         revenueToday: todaySalesTotals[0]?.revenue || 0,
         grossProfitToday: todayGrossProfit[0]?.total || 0,
         expensesToday: todayExpenses[0]?.total || 0,
+        returnCostToday:
+          (todayReturnCosts[0]?.returnCost || 0) -
+          (todayReturnCosts[0]?.replacementCost || 0),
         outstandingAmount: unpaidTotals[0]?.total || 0,
         lowStockProducts: lowStockProducts.map((product) => ({
           _id: product._id.toString(),

@@ -13,6 +13,7 @@ type ReportSummary = {
   revenue: number
   grossProfit: number
   expenses: number
+  returnCostImpact: number
   revenueCash: number
   revenueMobileMoney: number
   revenueBank: number
@@ -87,6 +88,7 @@ function sumReports(reports: ReportSummary[]) {
       revenue: total.revenue + report.revenue,
       grossProfit: total.grossProfit + report.grossProfit,
       expenses: total.expenses + report.expenses,
+      returnCostImpact: total.returnCostImpact + report.returnCostImpact,
       revenueCash: total.revenueCash + report.revenueCash,
       revenueMobileMoney: total.revenueMobileMoney + report.revenueMobileMoney,
       revenueBank: total.revenueBank + report.revenueBank,
@@ -104,6 +106,7 @@ function sumReports(reports: ReportSummary[]) {
       revenue: 0,
       grossProfit: 0,
       expenses: 0,
+      returnCostImpact: 0,
       revenueCash: 0,
       revenueMobileMoney: 0,
       revenueBank: 0,
@@ -147,7 +150,7 @@ export function ReportPrintButton({
         (report) => `
           <tr>
             <td>${escapeHtml(formatCurrency(report.revenue))}</td>
-            <td>${escapeHtml(formatCurrency(report.grossProfit - report.expenses))}</td>
+            <td>${escapeHtml(formatCurrency(report.grossProfit - report.expenses + report.returnCostImpact))}</td>
             <td>${escapeHtml(formatCurrency(report.expenses))}</td>
             <td>${escapeHtml(formatCurrency(report.revenueCash))}</td>
             <td>${escapeHtml(formatCurrency(report.revenueMobileMoney))}</td>
@@ -365,7 +368,7 @@ export function ReportPrintButton({
 
           <div class="metrics">
             <div class="metric"><span>Total Revenue</span><strong>${escapeHtml(formatCurrency(totals.revenue))}</strong></div>
-            <div class="metric"><span>Profit</span><strong>${escapeHtml(formatCurrency(totals.grossProfit - totals.expenses))}</strong></div>
+            <div class="metric"><span>Profit</span><strong>${escapeHtml(formatCurrency(totals.grossProfit - totals.expenses + totals.returnCostImpact))}</strong></div>
             <div class="${expenseClass}"><span>Expenses</span><strong>${escapeHtml(formatCurrency(totals.expenses))}</strong></div>
             <div class="metric"><span>Cash</span><strong>${escapeHtml(formatCurrency(totals.revenueCash))}</strong></div>
             <div class="metric"><span>Mobile Money</span><strong>${escapeHtml(formatCurrency(totals.revenueMobileMoney))}</strong></div>
