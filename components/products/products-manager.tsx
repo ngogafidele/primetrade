@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { formatCurrency } from "@/lib/utils/format"
 import { FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -77,6 +77,7 @@ export function ProductsManager({
   isAdmin,
 }: ProductsManagerProps) {
   const [products, setProducts] = useState(initialProducts)
+  const [search, setSearch] = useState("")
   const [formState, setFormState] = useState<FormState>(emptyForm)
   const [activeProductId, setActiveProductId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -84,15 +85,30 @@ export function ProductsManager({
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
 
-  const pageCount = Math.max(1, Math.ceil(products.length / PRODUCTS_PER_PAGE))
+  const filteredProducts = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return products
+
+    return products.filter((product) =>
+      product.name.toLowerCase().includes(query)
+    )
+  }, [products, search])
+
+  const pageCount = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE)
+  )
   const safeCurrentPage = Math.min(currentPage, pageCount)
   const pageStart = (safeCurrentPage - 1) * PRODUCTS_PER_PAGE
-  const paginatedProducts = products.slice(
+  const paginatedProducts = filteredProducts.slice(
     pageStart,
     pageStart + PRODUCTS_PER_PAGE
   )
-  const visibleStart = products.length === 0 ? 0 : pageStart + 1
-  const visibleEnd = Math.min(pageStart + PRODUCTS_PER_PAGE, products.length)
+  const visibleStart = filteredProducts.length === 0 ? 0 : pageStart + 1
+  const visibleEnd = Math.min(
+    pageStart + PRODUCTS_PER_PAGE,
+    filteredProducts.length
+  )
 
   useEffect(() => {
     if (currentPage > pageCount) {
@@ -509,6 +525,17 @@ export function ProductsManager({
         </div>
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <div className="grid gap-2 sm:max-w-md">
+        <label className="text-sm font-medium" htmlFor="product-search">
+          Search products
+        </label>
+        <Input
+          id="product-search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search by product name"
+        />
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
@@ -579,7 +606,10 @@ export function ProductsManager({
       </Table>
       <div className="flex flex-col gap-3 border-t border-border/80 pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>
-          Showing {visibleStart}-{visibleEnd} of {products.length} products
+          Showing {visibleStart}-{visibleEnd} of {filteredProducts.length} products
+          {search.trim()
+            ? ` (filtered from ${products.length})`
+            : ""}
         </p>
         <div className="flex items-center gap-2">
           <Button

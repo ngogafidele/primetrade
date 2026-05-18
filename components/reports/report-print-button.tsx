@@ -19,6 +19,7 @@ type ReportSummary = {
   invoices: number
   unpaidInvoices: number
   outstanding: number
+  outstandingSales: number
   adjustments: number
 }
 
@@ -92,6 +93,7 @@ function sumReports(reports: ReportSummary[]) {
       invoices: total.invoices + report.invoices,
       unpaidInvoices: total.unpaidInvoices + report.unpaidInvoices,
       outstanding: total.outstanding + report.outstanding,
+      outstandingSales: total.outstandingSales + report.outstandingSales,
       adjustments: total.adjustments + report.adjustments,
     }),
     {
@@ -108,6 +110,7 @@ function sumReports(reports: ReportSummary[]) {
       invoices: 0,
       unpaidInvoices: 0,
       outstanding: 0,
+      outstandingSales: 0,
       adjustments: 0,
     }
   )
@@ -136,6 +139,8 @@ export function ReportPrintButton({
       minute: "2-digit",
     })
     const outstandingClass = totals.outstanding > 0 ? "metric warning" : "metric"
+    const outstandingSalesClass =
+      totals.outstandingSales > 0 ? "metric warning" : "metric"
     const expenseClass = totals.expenses > 0 ? "metric warning" : "metric"
 
     const summaryRows = reports
@@ -150,6 +155,7 @@ export function ReportPrintButton({
             <td>${escapeHtml(formatCurrency(report.revenueBank))}</td>
             <td>${escapeHtml(formatNumber(report.sales))}</td>
             <td>${escapeHtml(formatNumber(report.products))}</td>
+            <td>${escapeHtml(formatCurrency(report.outstandingSales))}</td>
             <td>${escapeHtml(formatCurrency(report.outstanding))}</td>
           </tr>
         `
@@ -370,7 +376,8 @@ export function ReportPrintButton({
             <div class="metric"><span>Inventory Retail</span><strong>${escapeHtml(formatCurrency(totals.inventoryRetail))}</strong></div>
             <div class="metric"><span>Sales Records</span><strong>${escapeHtml(formatNumber(totals.sales))}</strong></div>
             <div class="metric"><span>Products</span><strong>${escapeHtml(formatNumber(totals.products))}</strong></div>
-            <div class="${outstandingClass}"><span>Outstanding</span><strong>${escapeHtml(formatCurrency(totals.outstanding))}</strong></div>
+            <div class="${outstandingSalesClass}"><span>Outstanding Sales</span><strong>${escapeHtml(formatCurrency(totals.outstandingSales))}</strong></div>
+            <div class="${outstandingClass}"><span>Outstanding Invoices</span><strong>${escapeHtml(formatCurrency(totals.outstanding))}</strong></div>
           </div>
 
           <div class="section-grid">
@@ -387,11 +394,12 @@ export function ReportPrintButton({
                     <th>Bank</th>
                     <th>Sales</th>
                     <th>Products</th>
-                    <th>Outstanding</th>
+                    <th>Outstanding Sales</th>
+                    <th>Outstanding Invoices</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${summaryRows || '<tr><td colspan="9">No summary data found.</td></tr>'}
+                  ${summaryRows || '<tr><td colspan="10">No summary data found.</td></tr>'}
                 </tbody>
               </table>
             </section>

@@ -40,6 +40,7 @@ type ReportSummary = {
   invoices: number
   unpaidInvoices: number
   outstanding: number
+  outstandingSales: number
   adjustments: number
 }
 
@@ -73,6 +74,11 @@ type InvoiceTotals = {
 type AdjustmentTotals = {
   _id: null
   adjustments: number
+}
+
+type OutstandingSalesTotals = {
+  _id: null
+  outstandingSales: number
 }
 
 type ExpenseTotals = {
@@ -197,6 +203,7 @@ function sumReports(reports: ReportSummary[]) {
       invoices: total.invoices + report.invoices,
       unpaidInvoices: total.unpaidInvoices + report.unpaidInvoices,
       outstanding: total.outstanding + report.outstanding,
+      outstandingSales: total.outstandingSales + report.outstandingSales,
       adjustments: total.adjustments + report.adjustments,
     }),
     {
@@ -213,6 +220,7 @@ function sumReports(reports: ReportSummary[]) {
       invoices: 0,
       unpaidInvoices: 0,
       outstanding: 0,
+      outstandingSales: 0,
       adjustments: 0,
     }
   )
@@ -242,6 +250,7 @@ export default async function ReportsPage({
     invoiceTotals,
     adjustmentTotals,
     expenseTotals,
+    outstandingSalesTotals,
     paymentTotals,
     topMovingProducts,
     recentSales,
@@ -332,6 +341,20 @@ export default async function ReportsPage({
         },
       },
     ]),
+    Sale.aggregate<OutstandingSalesTotals>([
+      {
+        $match: {
+          createdAt: periodFilter,
+          paymentStatus: "unpaid",
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          outstandingSales: { $sum: "$totalAmount" },
+        },
+      },
+    ]),
     Sale.aggregate<PaymentMethodTotals>([
       {
         $match: {
@@ -406,6 +429,7 @@ export default async function ReportsPage({
     invoices: invoiceTotals[0]?.invoices ?? 0,
     unpaidInvoices: invoiceTotals[0]?.unpaidInvoices ?? 0,
     outstanding: invoiceTotals[0]?.outstanding ?? 0,
+    outstandingSales: outstandingSalesTotals[0]?.outstandingSales ?? 0,
     adjustments: adjustmentTotals[0]?.adjustments ?? 0,
   }
 
@@ -437,7 +461,14 @@ export default async function ReportsPage({
     { label: "Inventory Retail", value: formatCurrency(totals.inventoryRetail) },
     { label: "Sales Records", value: formatNumber(totals.sales) },
     { label: "Products", value: formatNumber(totals.products) },
-    { label: "Outstanding", value: formatCurrency(totals.outstanding) },
+    {
+      label: "Outstanding Sales",
+      value: formatCurrency(totals.outstandingSales),
+    },
+    {
+      label: "Outstanding Invoices",
+      value: formatCurrency(totals.outstanding),
+    },
   ]
 
   const paymentCards = [
@@ -544,7 +575,8 @@ export default async function ReportsPage({
               <TableHead>Bank</TableHead>
               <TableHead>Sales</TableHead>
               <TableHead>Products</TableHead>
-              <TableHead>Outstanding</TableHead>
+              <TableHead>Outstanding Sales</TableHead>
+              <TableHead>Outstanding Invoices</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -560,6 +592,7 @@ export default async function ReportsPage({
                 <TableCell>{formatCurrency(report.revenueBank)}</TableCell>
                 <TableCell>{formatNumber(report.sales)}</TableCell>
                 <TableCell>{formatNumber(report.products)}</TableCell>
+                <TableCell>{formatCurrency(report.outstandingSales)}</TableCell>
                 <TableCell>{formatCurrency(report.outstanding)}</TableCell>
               </TableRow>
             ))}
