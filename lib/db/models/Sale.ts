@@ -14,6 +14,15 @@ const SaleItemSchema = new Schema(
   { _id: false }
 )
 
+const OutstandingDetailsSchema = new Schema(
+  {
+    customerName: { type: String, required: true, trim: true },
+    customerPhone: { type: String, required: true, trim: true },
+    paymentDate: { type: Date, required: true },
+  },
+  { _id: false }
+)
+
 const SaleSchema = new Schema(
   {
     items: { type: [SaleItemSchema], required: true },
@@ -27,10 +36,10 @@ const SaleSchema = new Schema(
     paymentMethod: {
       type: String,
       enum: ["cash", "mobile-money", "bank"],
-      required: true,
     },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     notes: { type: String, default: "" },
+    outstanding: { type: OutstandingDetailsSchema, default: undefined },
   },
   { timestamps: true }
 )

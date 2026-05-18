@@ -53,14 +53,21 @@ type SaleClient = {
   items: SaleItemClient[]
   totalAmount: number
   paymentStatus: "paid" | "unpaid"
-  paymentMethod: "cash" | "mobile-money" | "bank"
+  paymentMethod?: "cash" | "mobile-money" | "bank"
   notes: string
+  outstanding?: OutstandingDetails
   createdByName?: string
   createdAtLabel?: string
   createdAt?: string
 }
 
 type InvoiceStatus = "paid" | "unpaid"
+
+type OutstandingDetails = {
+  customerName: string
+  customerPhone: string
+  paymentDate: string
+}
 
 type DraftItem = {
   productId: string
@@ -80,6 +87,11 @@ const defaultInvoiceForm = {
   customerEmail: "",
   customerPhone: "",
   status: "unpaid" as InvoiceStatus,
+}
+const defaultOutstandingForm: OutstandingDetails = {
+  customerName: "",
+  customerPhone: "",
+  paymentDate: "",
 }
 
 export function SalesManager({
@@ -104,8 +116,11 @@ export function SalesManager({
   const [invoiceSubmitting, setInvoiceSubmitting] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
+  const [outstandingDialogOpen, setOutstandingDialogOpen] = useState(false)
   const [activeInvoiceSale, setActiveInvoiceSale] = useState<SaleClient | null>(null)
   const [invoiceForm, setInvoiceForm] = useState(defaultInvoiceForm)
+  const [outstandingForm, setOutstandingForm] = useState(defaultOutstandingForm)
+  const [outstandingError, setOutstandingError] = useState<string | null>(null)
   const [invoicedSaleIds, setInvoicedSaleIds] = useState<string[]>([])
 
   const productMap = useMemo(
@@ -171,6 +186,8 @@ export function SalesManager({
     setPaymentStatus("paid")
     setPaymentMethod("cash")
     setError(null)
+    setOutstandingForm(defaultOutstandingForm)
+    setOutstandingError(null)
   }
 
   const openInvoiceDialog = (sale: SaleClient) => {
@@ -187,9 +204,7 @@ export function SalesManager({
     return item.name?.trim() || item.sku?.trim() || "Unnamed item"
   }
 
-  const submitSale = async () => {
-    setError(null)
-
+  const validateSaleItems = () => {
     const payloadItems = draftItems.map((item) => ({
       productId: item.productId,
       quantity: Number(item.quantity),
@@ -198,7 +213,7 @@ export function SalesManager({
 
     if (payloadItems.some((item) => !item.productId)) {
       setError("Select a product for each line.")
-      return
+      return null
     }
 
     if (
@@ -211,7 +226,7 @@ export function SalesManager({
       )
     ) {
       setError("Quantity must be at least 1 and price must be 0 or more.")
-      return
+      return null
     }
 
     const requestedByProduct = new Map<string, number>()
@@ -224,13 +239,23 @@ export function SalesManager({
       const product = productMap.get(productId)
       if (!product) {
         setError("One selected product is no longer available.")
-        return
+        return null
       }
       if (totalRequested > product.quantity) {
         setError(`Insufficient stock for ${product.name}.`)
-        return
+        return null
       }
     }
+
+    return payloadItems
+  }
+
+  const recordSale = async (outstanding?: OutstandingDetails) => {
+    setError(null)
+    setOutstandingError(null)
+
+    const payloadItems = validateSaleItems()
+    if (!payloadItems) return
 
     setSubmitting(true)
 
@@ -241,14 +266,26 @@ export function SalesManager({
         body: JSON.stringify({
           items: payloadItems,
           paymentStatus,
-          paymentMethod,
+          ...(paymentStatus === "paid" ? { paymentMethod } : {}),
           notes: notes.trim(),
+          outstanding:
+            paymentStatus === "unpaid" && outstanding
+              ? {
+                  customerName: outstanding.customerName.trim(),
+                  customerPhone: outstanding.customerPhone.trim(),
+                  paymentDate: outstanding.paymentDate,
+                }
+              : undefined,
         }),
       })
 
       const body = await response.json()
       if (!response.ok || !body?.success) {
-        setError(body?.error ?? "Failed to record sale.")
+        const message = body?.error ?? "Failed to record sale."
+        setError(message)
+        if (paymentStatus === "unpaid") {
+          setOutstandingError(message)
+        }
         return
       }
 
@@ -257,17 +294,57 @@ export function SalesManager({
         {
           ...createdSale,
           paymentStatus: createdSale.paymentStatus ?? paymentStatus,
-          paymentMethod: createdSale.paymentMethod ?? paymentMethod,
+          paymentMethod:
+            createdSale.paymentMethod ??
+            (paymentStatus === "paid" ? paymentMethod : undefined),
         },
         ...current,
       ])
       setCurrentPage(1)
+      setOutstandingDialogOpen(false)
       resetForm()
     } catch {
       setError("Failed to record sale.")
+      if (paymentStatus === "unpaid") {
+        setOutstandingError("Failed to record sale.")
+      }
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const submitSale = async () => {
+    setError(null)
+
+    const payloadItems = validateSaleItems()
+    if (!payloadItems) return
+
+    if (paymentStatus === "unpaid") {
+      setOutstandingError(null)
+      setOutstandingDialogOpen(true)
+      return
+    }
+
+    await recordSale()
+  }
+
+  const submitOutstandingSale = async () => {
+    if (!outstandingForm.customerName.trim()) {
+      setOutstandingError("Customer names are required.")
+      return
+    }
+
+    if (!outstandingForm.customerPhone.trim()) {
+      setOutstandingError("Phone number is required.")
+      return
+    }
+
+    if (!outstandingForm.paymentDate) {
+      setOutstandingError("Payment date is required.")
+      return
+    }
+
+    await recordSale(outstandingForm)
   }
 
   const submitInvoice = async () => {
@@ -318,9 +395,8 @@ export function SalesManager({
   const paymentStatusLabel = (status: InvoiceStatus) =>
     status === "paid" ? "Paid" : "Unpaid"
 
-  const paymentMethodLabel = (
-    method: "cash" | "mobile-money" | "bank"
-  ) => {
+  const paymentMethodLabel = (method?: "cash" | "mobile-money" | "bank") => {
+    if (!method) return "-"
     if (method === "mobile-money") return "Mobile Money"
     if (method === "bank") return "Bank"
     return "Cash"
@@ -440,24 +516,26 @@ export function SalesManager({
             </Select>
           </label>
 
-          <label className="grid gap-1 text-sm">
-            Payment Method
-            <Select
-              value={paymentMethod}
-              onValueChange={(value) =>
-                setPaymentMethod(value as "cash" | "mobile-money" | "bank")
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="mobile-money">Mobile Money</SelectItem>
-                <SelectItem value="bank">Bank</SelectItem>
-              </SelectContent>
-            </Select>
-          </label>
+          {paymentStatus === "paid" ? (
+            <label className="grid gap-1 text-sm">
+              Payment Method
+              <Select
+                value={paymentMethod}
+                onValueChange={(value) =>
+                  setPaymentMethod(value as "cash" | "mobile-money" | "bank")
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="mobile-money">Mobile Money</SelectItem>
+                  <SelectItem value="bank">Bank</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          ) : null}
         </div>
 
         <label className="grid gap-1 text-sm">
@@ -601,6 +679,84 @@ export function SalesManager({
           </Button>
         </div>
       </div>
+
+      <Dialog
+        open={outstandingDialogOpen}
+        onOpenChange={(open) => {
+          setOutstandingDialogOpen(open)
+          if (!open) {
+            setOutstandingError(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Outstanding Details</DialogTitle>
+          </DialogHeader>
+
+          <div className="rounded-lg border border-border/80 bg-muted/40 p-3 text-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              Unpaid Sale
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              Add customer details and the expected payment date before
+              recording this sale.
+            </p>
+          </div>
+
+          <div className="grid gap-3">
+            <label className="grid gap-1 text-sm">
+              Customer Names
+              <Input
+                value={outstandingForm.customerName}
+                onChange={(event) =>
+                  setOutstandingForm((current) => ({
+                    ...current,
+                    customerName: event.target.value,
+                  }))
+                }
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm">
+              Phone Number
+              <Input
+                value={outstandingForm.customerPhone}
+                onChange={(event) =>
+                  setOutstandingForm((current) => ({
+                    ...current,
+                    customerPhone: event.target.value,
+                  }))
+                }
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm">
+              Payment Date
+              <Input
+                type="date"
+                value={outstandingForm.paymentDate}
+                onChange={(event) =>
+                  setOutstandingForm((current) => ({
+                    ...current,
+                    paymentDate: event.target.value,
+                  }))
+                }
+              />
+            </label>
+          </div>
+
+          {outstandingError ? (
+            <p className="text-sm text-destructive">{outstandingError}</p>
+          ) : null}
+
+          <DialogFooter showCloseButton>
+            <Button onClick={submitOutstandingSale} disabled={submitting}>
+              {submitting ? "Recording..." : "Record Sale"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={invoiceDialogOpen}

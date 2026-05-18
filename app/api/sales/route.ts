@@ -130,13 +130,31 @@ export async function POST(request: NextRequest) {
 
     let sale
     try {
+      const outstanding =
+        payload.paymentStatus === "unpaid" && payload.outstanding
+          ? {
+              customerName: payload.outstanding.customerName,
+              customerPhone: payload.outstanding.customerPhone,
+              paymentDate: new Date(payload.outstanding.paymentDate),
+            }
+          : undefined
+
+      if (
+        outstanding?.paymentDate &&
+        Number.isNaN(outstanding.paymentDate.getTime())
+      ) {
+        throw new Error("Payment date is invalid")
+      }
+
       sale = await Sale.create({
         items: saleItems,
         totalAmount,
         paymentStatus: payload.paymentStatus,
-        paymentMethod: payload.paymentMethod,
+        paymentMethod:
+          payload.paymentStatus === "paid" ? payload.paymentMethod : undefined,
         createdBy: session.userId,
         notes: payload.notes ?? "",
+        outstanding,
       })
     } catch (error) {
       if (decrementedProducts.length > 0) {

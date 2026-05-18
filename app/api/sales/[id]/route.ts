@@ -45,6 +45,55 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { authorized, session } = await requireAuth(request)
+    if (!authorized || !session) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const payload = await request.json().catch(() => null)
+    if (payload?.paymentStatus !== "paid") {
+      return NextResponse.json(
+        { success: false, error: "Only paid status updates are supported" },
+        { status: 400 }
+      )
+    }
+
+    const { id } = await context.params
+
+    await connectToDatabase()
+    const sale = await Sale.findOneAndUpdate(
+      { _id: id, paymentStatus: "unpaid" },
+      {
+        $set: { paymentStatus: "paid" },
+        $unset: { outstanding: "" },
+      },
+      { new: true }
+    )
+
+    if (!sale) {
+      return NextResponse.json(
+        { success: false, error: "Outstanding sale not found" },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({ success: true, data: sale })
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: "Failed to update sale" },
+      { status: 400 }
+    )
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }

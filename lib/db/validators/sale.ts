@@ -9,11 +9,34 @@ export const SaleItemSchema = z
   })
   .strict()
 
+export const OutstandingDetailsSchema = z
+  .object({
+    customerName: z.string().trim().min(1),
+    customerPhone: z.string().trim().min(1),
+    paymentDate: z.string().trim().min(1),
+  })
+  .strict()
+
 export const CreateSaleSchema = z
   .object({
     items: z.array(SaleItemSchema).min(1),
     paymentStatus: z.enum(["paid", "unpaid"]),
-    paymentMethod: z.enum(["cash", "mobile-money", "bank"]),
+    paymentMethod: z.enum(["cash", "mobile-money", "bank"]).optional(),
     notes: z.string().optional(),
+    outstanding: OutstandingDetailsSchema.optional(),
   })
   .strict()
+  .refine(
+    (value) => value.paymentStatus === "paid" || Boolean(value.outstanding),
+    {
+      message: "Outstanding details are required for unpaid sales",
+      path: ["outstanding"],
+    }
+  )
+  .refine(
+    (value) => value.paymentStatus === "unpaid" || Boolean(value.paymentMethod),
+    {
+      message: "Payment method is required for paid sales",
+      path: ["paymentMethod"],
+    }
+  )

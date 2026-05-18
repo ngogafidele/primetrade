@@ -30,8 +30,13 @@ type SalesPageSale = {
   createdBy?: PopulatedSaleUser | { toString(): string }
   totalAmount: number
   paymentStatus: "paid" | "unpaid"
-  paymentMethod: "cash" | "mobile-money" | "bank"
+  paymentMethod?: "cash" | "mobile-money" | "bank"
   notes: string
+  outstanding?: {
+    customerName: string
+    customerPhone: string
+    paymentDate?: Date
+  }
   items: SalesPageSaleItem[]
 }
 
@@ -82,6 +87,12 @@ export default async function SalesPage() {
         })
       : "-",
     updatedAt: sale.updatedAt?.toISOString(),
+    outstanding: sale.outstanding
+      ? {
+          ...sale.outstanding,
+          paymentDate: sale.outstanding.paymentDate?.toISOString(),
+        }
+      : undefined,
     createdBy:
       isPopulatedSaleUser(sale.createdBy)
         ? sale.createdBy._id.toString()
