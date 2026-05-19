@@ -300,10 +300,14 @@ export function InvoicesManager({
           <title>${escapeHtml(invoice.invoiceNumber)}</title>
           <style>
             * { box-sizing: border-box; }
+            html {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
             body {
               margin: 0;
               padding: 36px;
-              color: #172554;
+              color: #000000;
               font-family: Arial, sans-serif;
               background: #ffffff;
             }
@@ -311,7 +315,7 @@ export function InvoicesManager({
               display: flex;
               justify-content: space-between;
               gap: 32px;
-              border-bottom: 2px solid #1d4ed8;
+              border-bottom: 3px solid #000000;
               padding-bottom: 18px;
               margin-bottom: 28px;
             }
@@ -326,7 +330,7 @@ export function InvoicesManager({
             }
             p {
               margin: 0 0 5px;
-              color: #52627a;
+              color: #000000;
               font-size: 13px;
             }
             .invoice-meta {
@@ -340,7 +344,7 @@ export function InvoicesManager({
               margin-bottom: 28px;
             }
             .panel {
-              border: 1px solid #bfdbfe;
+              border: 1.5px solid #000000;
               padding: 16px;
               min-height: 112px;
             }
@@ -350,21 +354,21 @@ export function InvoicesManager({
               font-size: 12px;
             }
             th {
-              background: #dbeafe;
-              color: #1e3a8a;
+              background: #d1d5db;
+              color: #000000;
               text-align: left;
-              border: 1px solid #bfdbfe;
+              border: 1.5px solid #000000;
               padding: 10px 8px;
             }
             td {
-              border: 1px solid #bfdbfe;
+              border: 1.5px solid #000000;
               padding: 9px 8px;
               vertical-align: top;
             }
             td span {
               display: block;
               margin-top: 3px;
-              color: #64748b;
+              color: #000000;
               font-size: 11px;
             }
             .total {
@@ -374,15 +378,22 @@ export function InvoicesManager({
             }
             .total div {
               min-width: 260px;
-              border: 1px solid #bfdbfe;
+              border: 1.5px solid #000000;
               padding: 16px;
-              background: #f8fbff;
+              background: #eeeeee;
             }
             .total strong {
               display: flex;
               justify-content: space-between;
               gap: 24px;
               font-size: 18px;
+            }
+            .thanks {
+              margin-top: 28px;
+              text-align: center;
+              color: #000000;
+              font-size: 14px;
+              font-weight: 700;
             }
             @page {
               size: A4;
@@ -456,12 +467,13 @@ export function InvoicesManager({
 
           <section class="total">
             <div>
-              <p style="margin: 0 0 8px; font-size: 12px; color: #52627a;">Payements methods</p>
-              <p style="margin: 0; font-size: 12px; color: #52627a;">Equity Bank Account: 4014201273279</p>
-              <p style="margin: 0; font-size: 12px; color: #52627a;">Momo Pay: 77876</p>
-              <p style="margin: 0; font-size: 12px; color: #52627a;">Momo Pay Name: Prime Trade Company</p>
+              <p style="margin: 0 0 8px; font-size: 13px; color: #000000; font-weight: 700;">Payment Methods:</p>
+              <p style="margin: 0; font-size: 13px; color: #000000;">Equity Bank Account: 4014201273279 (Prime Trade Company Ltd)</p>
+              <p style="margin: 0; font-size: 13px; color: #000000;">Momo Pay: 77876 (Prime Trade Company)</p>
             </div>
           </section>
+
+          <p class="thanks">Thank You For Doing Business with Prime Trade Company Ltd</p>
 
           <script>
             window.addEventListener("load", () => {

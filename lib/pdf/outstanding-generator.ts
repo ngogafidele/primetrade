@@ -82,6 +82,15 @@ const businessFooterLines = [
   "Momo Pay Name: Prime Trade Company",
 ]
 
+const printColor = {
+  text: "#000000",
+  muted: "#000000",
+  accent: "#000000",
+  headerBackground: "#d1d5db",
+  rowBackground: "#eeeeee",
+  rule: "#000000",
+}
+
 function getLogoBuffer() {
   if (!existsSync(logoPath)) return null
   return readFileSync(logoPath)
@@ -104,7 +113,7 @@ function drawLogo(doc: OutstandingPdfDocument, storeInfo: StoreInfo) {
   } catch {
     doc
       .fontSize(16)
-      .fillColor("#1d4ed8")
+      .fillColor(printColor.text)
       .text(storeInfo.name ?? "Inventory", 48, 72, { width: 150 })
   }
 }
@@ -131,14 +140,17 @@ export async function generateOutstandingCustomerPDF(
     doc.on("error", reject)
   })
 
+  doc.font("Helvetica")
   drawLogo(doc, storeInfo)
 
   doc
-    .fillColor("#172554")
+    .fillColor(printColor.text)
+    .font("Helvetica-Bold")
     .fontSize(22)
     .text("Outstanding Statement", 310, 58, { align: "right" })
+    .font("Helvetica")
     .fontSize(10)
-    .fillColor("#52627a")
+    .fillColor(printColor.muted)
     .text(data.number, 310, 88, { align: "right" })
     .text(`Generated: ${formatDate(data.generatedAt)}`, 310, 104, {
       align: "right",
@@ -148,34 +160,39 @@ export async function generateOutstandingCustomerPDF(
     .moveTo(48, 178)
     .lineTo(547, 178)
     .lineWidth(1.5)
-    .strokeColor("#1d4ed8")
+    .strokeColor(printColor.accent)
     .stroke()
 
   doc
     .fontSize(11)
-    .fillColor("#172554")
+    .font("Helvetica-Bold")
+    .fillColor(printColor.text)
     .text(storeInfo.name ?? "Prime Trade Inventory", 48, 204)
-    .fontSize(9)
-    .fillColor("#52627a")
+    .font("Helvetica")
+    .fontSize(10)
+    .fillColor(printColor.muted)
     .text(storeInfo.address ?? "", 48, 222)
     .text(storeInfo.phone ?? "", 48, 236)
     .text(storeInfo.email ?? "", 48, 250)
 
   doc
     .fontSize(11)
-    .fillColor("#172554")
+    .font("Helvetica-Bold")
+    .fillColor(printColor.text)
     .text("Customer", 330, 204)
-    .fontSize(9)
-    .fillColor("#52627a")
+    .font("Helvetica")
+    .fontSize(10)
+    .fillColor(printColor.muted)
     .text(data.customerName, 330, 222)
     .text(data.customerPhone ?? "", 330, 236)
 
   const tableTop = 300
   doc
     .rect(48, tableTop, 499, 24)
-    .fillColor("#dbeafe")
+    .fillColor(printColor.headerBackground)
     .fill()
-    .fillColor("#1e3a8a")
+    .fillColor(printColor.text)
+    .font("Helvetica-Bold")
     .fontSize(9)
     .text("Sale Date", 54, tableTop + 8)
     .text("Payment Date", 122, tableTop + 8)
@@ -193,11 +210,12 @@ export async function generateOutstandingCustomerPDF(
     }
 
     doc
-      .fillColor(index % 2 === 0 ? "#ffffff" : "#f8fbff")
+      .fillColor(index % 2 === 0 ? "#ffffff" : printColor.rowBackground)
       .rect(48, y - 7, 499, 42)
       .fill()
-      .fillColor("#172554")
-      .fontSize(8)
+      .font("Helvetica")
+      .fillColor(printColor.text)
+      .fontSize(10)
       .text(formatDate(sale.saleDate), 54, y, { width: 62 })
       .text(formatDate(sale.paymentDate), 122, y, { width: 78 })
       .text(sale.items, 206, y, { width: 130 })
@@ -216,10 +234,11 @@ export async function generateOutstandingCustomerPDF(
   doc
     .moveTo(48, y)
     .lineTo(547, y)
-    .strokeColor("#bfdbfe")
+    .strokeColor(printColor.rule)
     .stroke()
+    .font("Helvetica-Bold")
     .fontSize(14)
-    .fillColor("#172554")
+    .fillColor(printColor.text)
     .text("Total Outstanding", 330, y + 20)
     .text(formatCurrency(data.totalAmount), 448, y + 20, { width: 92 })
 
@@ -232,7 +251,7 @@ export async function generateOutstandingCustomerPDF(
   doc
     .font("Helvetica-Bold")
     .fontSize(9)
-    .fillColor("#172554")
+    .fillColor(printColor.text)
     .text(businessFooterLines.join("\n"), 48, footerY, { width: 220 })
 
   doc.end()

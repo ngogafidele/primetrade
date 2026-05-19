@@ -93,6 +93,15 @@ const businessFooterLines = [
   "Momo Pay Name: Prime Trade Company",
 ]
 
+const printColor = {
+  text: "#000000",
+  muted: "#000000",
+  accent: "#000000",
+  headerBackground: "#d1d5db",
+  rowBackground: "#eeeeee",
+  rule: "#000000",
+}
+
 function getLogoBuffer() {
   if (!existsSync(logoPath)) return null
   return readFileSync(logoPath)
@@ -131,7 +140,7 @@ function drawLogo(doc: ReceiptPdfDocument, storeInfo: StoreInfo) {
       })
       doc
         .fontSize(16)
-        .fillColor("#1d4ed8")
+        .fillColor(printColor.text)
         .text(storeInfo.name ?? "Inventory", 48, 72, { width: 150 })
     }
   }
@@ -156,16 +165,18 @@ function renderItemsTable(
 
   doc
     .fontSize(12)
-    .fillColor("#172554")
+    .font("Helvetica-Bold")
+    .fillColor(printColor.text)
     .text(title, 48, y)
 
   y += 16
 
   doc
     .rect(48, y, 499, 22)
-    .fillColor("#dbeafe")
+    .fillColor(printColor.headerBackground)
     .fill()
-    .fillColor("#1e3a8a")
+    .fillColor(printColor.text)
+    .font("Helvetica-Bold")
     .fontSize(9)
     .text("Item", 54, y + 7)
     .text("Qty", 286, y + 7)
@@ -181,17 +192,18 @@ function renderItemsTable(
     }
 
     doc
-      .fillColor(index % 2 === 0 ? "#ffffff" : "#f8fbff")
+      .fillColor(index % 2 === 0 ? "#ffffff" : printColor.rowBackground)
       .rect(48, y - 6, 499, 32)
       .fill()
-      .fillColor("#172554")
-      .fontSize(9)
+      .font("Helvetica")
+      .fillColor(printColor.text)
+      .fontSize(10)
       .text(item.description, 54, y, { width: 210 })
-      .fillColor("#64748b")
-      .fontSize(8)
-      .text(item.sku ?? "", 54, y + 12, { width: 210 })
-      .fillColor("#172554")
+      .fillColor(printColor.muted)
       .fontSize(9)
+      .text(item.sku ?? "", 54, y + 12, { width: 210 })
+      .fillColor(printColor.text)
+      .fontSize(10)
       .text(`${item.quantity} ${item.unit ?? "pcs"}`, 286, y)
       .text(formatCurrency(item.unitPrice), 355, y, { width: 82 })
       .text(formatCurrency(item.lineTotal), 448, y, { width: 92 })
@@ -224,14 +236,17 @@ export async function generateReturnReceiptPDF(
     doc.on("error", reject)
   })
 
+  doc.font("Helvetica")
   drawLogo(doc, storeInfo)
 
   doc
-    .fillColor("#172554")
+    .fillColor(printColor.text)
+    .font("Helvetica-Bold")
     .fontSize(22)
     .text("Return Receipt", 340, 58, { align: "right" })
+    .font("Helvetica")
     .fontSize(10)
-    .fillColor("#52627a")
+    .fillColor(printColor.muted)
     .text(receipt.receiptNumber, 340, 88, { align: "right" })
     .text(`Date: ${formatDate(receipt.date)}`, 340, 104, { align: "right" })
 
@@ -245,15 +260,17 @@ export async function generateReturnReceiptPDF(
     .moveTo(48, 210)
     .lineTo(547, 210)
     .lineWidth(1.5)
-    .strokeColor("#1d4ed8")
+    .strokeColor(printColor.accent)
     .stroke()
 
   doc
     .fontSize(11)
-    .fillColor("#172554")
+    .font("Helvetica-Bold")
+    .fillColor(printColor.text)
     .text(storeInfo.name ?? "Prime Trade Inventory", 48, 230)
-    .fontSize(9)
-    .fillColor("#52627a")
+    .font("Helvetica")
+    .fontSize(10)
+    .fillColor(printColor.muted)
     .text(storeInfo.address ?? "", 48, 248)
     .text(storeInfo.phone ?? "", 48, 262)
     .text(storeInfo.email ?? "", 48, 276)
@@ -271,12 +288,13 @@ export async function generateReturnReceiptPDF(
   doc
     .moveTo(48, y)
     .lineTo(547, y)
-    .strokeColor("#bfdbfe")
+    .strokeColor(printColor.rule)
     .stroke()
 
   doc
     .fontSize(11)
-    .fillColor("#172554")
+    .font("Helvetica-Bold")
+    .fillColor(printColor.text)
     .text("Return Total", 355, y + 16)
     .text(formatCurrency(receipt.totalReturnAmount), 448, y + 16, {
       width: 92,
@@ -291,10 +309,12 @@ export async function generateReturnReceiptPDF(
   if (receipt.notes) {
     doc
       .fontSize(10)
-      .fillColor("#172554")
+      .font("Helvetica-Bold")
+      .fillColor(printColor.text)
       .text("Notes", 48, footerY)
       .fontSize(9)
-      .fillColor("#52627a")
+      .font("Helvetica")
+      .fillColor(printColor.muted)
       .text(receipt.notes, 48, footerY + 12, { width: 300 })
     footerY += 46
   }
@@ -307,7 +327,7 @@ export async function generateReturnReceiptPDF(
   doc
     .font("Helvetica-Bold")
     .fontSize(9)
-    .fillColor("#172554")
+    .fillColor(printColor.text)
     .text(businessFooterLines.join("\n"), 48, footerY, { width: 220 })
 
   doc.end()

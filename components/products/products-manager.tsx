@@ -276,10 +276,14 @@ export function ProductsManager({
           <title>Products Catalog</title>
           <style>
             * { box-sizing: border-box; }
+            html {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
             body {
               margin: 0;
               padding: 32px;
-              color: #172554;
+              color: #000000;
               font-family: Arial, sans-serif;
               background: #ffffff;
             }
@@ -287,7 +291,7 @@ export function ProductsManager({
               display: flex;
               justify-content: space-between;
               gap: 24px;
-              border-bottom: 2px solid #1d4ed8;
+              border-bottom: 3px solid #000000;
               padding-bottom: 16px;
               margin-bottom: 24px;
             }
@@ -298,7 +302,7 @@ export function ProductsManager({
             }
             p {
               margin: 0;
-              color: #52627a;
+              color: #000000;
               font-size: 13px;
             }
             .summary {
@@ -311,25 +315,25 @@ export function ProductsManager({
               font-size: 12px;
             }
             th {
-              background: #dbeafe;
-              color: #1e3a8a;
+              background: #d1d5db;
+              color: #000000;
               text-align: left;
-              border: 1px solid #bfdbfe;
+              border: 1.5px solid #000000;
               padding: 9px 8px;
             }
             td {
-              border: 1px solid #bfdbfe;
+              border: 1.5px solid #000000;
               padding: 8px;
               vertical-align: top;
             }
             td span {
               display: block;
               margin-top: 3px;
-              color: #64748b;
+              color: #000000;
               font-size: 11px;
             }
             tr:nth-child(even) td {
-              background: #f8fbff;
+              background: #eeeeee;
             }
             @page {
               size: A4 landscape;
