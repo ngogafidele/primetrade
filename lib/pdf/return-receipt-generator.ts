@@ -37,9 +37,7 @@ type ReturnReceiptData = {
   processedBy?: string
   notes?: string
   returnItems: ReceiptItem[]
-  replacementItems: ReceiptItem[]
   totalReturnAmount: number
-  totalReplacementAmount: number
 }
 
 type StoreInfo = {
@@ -277,8 +275,6 @@ export async function generateReturnReceiptPDF(
 
   let y = 320
   y = renderItemsTable(doc, "Returned Items", receipt.returnItems, y)
-  y += 16
-  y = renderItemsTable(doc, "Replacement Items", receipt.replacementItems, y)
 
   if (y > 660) {
     doc.addPage()
@@ -295,16 +291,12 @@ export async function generateReturnReceiptPDF(
     .fontSize(11)
     .font("Helvetica-Bold")
     .fillColor(printColor.text)
-    .text("Return Total", 355, y + 16)
+    .text("Revenue Reversed", 330, y + 16)
     .text(formatCurrency(receipt.totalReturnAmount), 448, y + 16, {
       width: 92,
     })
-    .text("Replacement Total", 355, y + 34)
-    .text(formatCurrency(receipt.totalReplacementAmount), 448, y + 34, {
-      width: 92,
-    })
 
-  let footerY = y + 70
+  let footerY = y + 52
 
   if (receipt.notes) {
     doc

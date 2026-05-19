@@ -78,16 +78,7 @@ export async function GET(
           unitPrice: item.unitPrice,
           lineTotal: item.lineTotal,
         })),
-        replacementItems: returnRecord.replacementItems.map((item) => ({
-          description: item.name,
-          sku: item.sku,
-          unit: item.unit ?? "pcs",
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          lineTotal: item.lineTotal,
-        })),
         totalReturnAmount: returnRecord.totalReturnAmount,
-        totalReplacementAmount: returnRecord.totalReplacementAmount,
       },
       {
         name: "Prime Trade Company Ltd",

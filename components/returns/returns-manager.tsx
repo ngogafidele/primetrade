@@ -16,7 +16,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-const TOTAL_TOLERANCE = 0.01
 const RETURNS_PER_PAGE = 20
 
 type ProductOption = {
@@ -41,9 +40,7 @@ type ReturnItemClient = {
 type ReturnClient = {
   _id: string
   returnItems: ReturnItemClient[]
-  replacementItems: ReturnItemClient[]
   totalReturnAmount: number
-  totalReplacementAmount: number
   notes: string
   createdByName?: string
   createdAtLabel?: string
@@ -86,9 +83,6 @@ export function ReturnsManager({
   const [returnDraftItems, setReturnDraftItems] = useState<DraftItem[]>([
     emptyDraft,
   ])
-  const [replacementDraftItems, setReplacementDraftItems] = useState<
-    DraftItem[]
-  >([emptyDraft])
   const [notes, setNotes] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -113,30 +107,23 @@ export function ReturnsManager({
   }, [currentPage, pageCount])
 
   const setDraftItem = (
-    list: "return" | "replacement",
     index: number,
     key: keyof DraftItem,
     value: string
   ) => {
-    const setter =
-      list === "return" ? setReturnDraftItems : setReplacementDraftItems
-    setter((current) =>
+    setReturnDraftItems((current) =>
       current.map((item, itemIndex) =>
         itemIndex === index ? { ...item, [key]: value } : item
       )
     )
   }
 
-  const addDraftItem = (list: "return" | "replacement") => {
-    const setter =
-      list === "return" ? setReturnDraftItems : setReplacementDraftItems
-    setter((current) => [...current, emptyDraft])
+  const addDraftItem = () => {
+    setReturnDraftItems((current) => [...current, emptyDraft])
   }
 
-  const removeDraftItem = (list: "return" | "replacement", index: number) => {
-    const setter =
-      list === "return" ? setReturnDraftItems : setReplacementDraftItems
-    setter((current) =>
+  const removeDraftItem = (index: number) => {
+    setReturnDraftItems((current) =>
       current.length === 1
         ? current
         : current.filter((_, itemIndex) => itemIndex !== index)
@@ -145,15 +132,11 @@ export function ReturnsManager({
 
   const resetForm = () => {
     setReturnDraftItems([emptyDraft])
-    setReplacementDraftItems([emptyDraft])
     setNotes("")
     setError(null)
   }
 
   const returnTotal = computeTotal(returnDraftItems)
-  const replacementTotal = computeTotal(replacementDraftItems)
-  const replacementWithinReturn =
-    replacementTotal - returnTotal <= TOTAL_TOLERANCE
 
   const getItemLabel = (item: ReturnItemClient) => {
     return item.name?.trim() || item.sku?.trim() || "Unnamed item"
@@ -171,15 +154,9 @@ export function ReturnsManager({
     setError(null)
 
     const returnItems = validateItems(returnDraftItems)
-    const replacementItems = validateItems(replacementDraftItems)
 
     if (returnItems.some((item) => !item.productId)) {
       setError("Select a product for each return line.")
-      return
-    }
-
-    if (replacementItems.some((item) => !item.productId)) {
-      setError("Select a product for each replacement line.")
       return
     }
 
@@ -191,42 +168,15 @@ export function ReturnsManager({
         item.unitPrice < 0
     )
 
-    const hasInvalidReplacement = replacementItems.some(
-      (item) =>
-        Number.isNaN(item.quantity) ||
-        item.quantity < 1 ||
-        Number.isNaN(item.unitPrice) ||
-        item.unitPrice < 0
-    )
-
-    if (hasInvalidReturn || hasInvalidReplacement) {
+    if (hasInvalidReturn) {
       setError("Quantity must be at least 1 and price must be 0 or more.")
       return
     }
 
-    if (!replacementWithinReturn) {
-      setError("Replacement total cannot exceed the return total.")
-      return
-    }
-
-    const netChanges = new Map<string, number>()
     for (const item of returnItems) {
-      const current = netChanges.get(item.productId) ?? 0
-      netChanges.set(item.productId, current + item.quantity)
-    }
-    for (const item of replacementItems) {
-      const current = netChanges.get(item.productId) ?? 0
-      netChanges.set(item.productId, current - item.quantity)
-    }
-
-    for (const [productId, change] of netChanges.entries()) {
-      const product = productMap.get(productId)
+      const product = productMap.get(item.productId)
       if (!product) {
         setError("One selected product is no longer available.")
-        return
-      }
-      if (product.quantity + change < 0) {
-        setError(`Insufficient stock for ${product.name}.`)
         return
       }
     }
@@ -239,7 +189,6 @@ export function ReturnsManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           returnItems,
-          replacementItems,
           notes: notes.trim(),
         }),
       })
@@ -302,17 +251,14 @@ export function ReturnsManager({
     }
   }
 
-  const renderItemRows = (
-    items: DraftItem[],
-    list: "return" | "replacement"
-  ) => {
+  const renderItemRows = (items: DraftItem[]) => {
     return items.map((item, index) => {
       const selectedProduct = item.productId
         ? productMap.get(item.productId)
         : null
       return (
         <div
-          key={`${list}-${index}-${item.productId}`}
+          key={`return-${index}-${item.productId}`}
           className="grid gap-3 rounded-lg border border-border/80 p-3 md:grid-cols-[1.6fr_0.8fr_1fr_auto]"
         >
           <label className="grid gap-1 text-sm">
@@ -322,9 +268,9 @@ export function ReturnsManager({
               value={item.productId}
               onValueChange={(value) => {
                 const product = productMap.get(value)
-                setDraftItem(list, index, "productId", value)
+                setDraftItem(index, "productId", value)
                 if (product) {
-                  setDraftItem(list, index, "unitPrice", String(product.price))
+                  setDraftItem(index, "unitPrice", String(product.price))
                 }
               }}
             />
@@ -338,7 +284,7 @@ export function ReturnsManager({
               placeholder="e.g. 2"
               value={item.quantity}
               onChange={(event) =>
-                setDraftItem(list, index, "quantity", event.target.value)
+                setDraftItem(index, "quantity", event.target.value)
               }
             />
           </label>
@@ -352,7 +298,7 @@ export function ReturnsManager({
               placeholder="e.g. 1200"
               value={item.unitPrice}
               onChange={(event) =>
-                setDraftItem(list, index, "unitPrice", event.target.value)
+                setDraftItem(index, "unitPrice", event.target.value)
               }
             />
           </label>
@@ -360,7 +306,7 @@ export function ReturnsManager({
           <div className="flex items-end">
             <Button
               variant="outline"
-              onClick={() => removeDraftItem(list, index)}
+              onClick={() => removeDraftItem(index)}
               disabled={items.length === 1}
             >
               Remove
@@ -383,7 +329,7 @@ export function ReturnsManager({
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
           Customer Service
         </p>
-        <h2 className="text-2xl font-semibold">Returns & Exchanges</h2>
+        <h2 className="text-2xl font-semibold">Returns</h2>
         <p className="text-sm text-muted-foreground">
           Logged in as: {currentUserLabel}
         </p>
@@ -393,49 +339,22 @@ export function ReturnsManager({
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-lg font-semibold">Returned Items</h3>
-            <Button variant="outline" onClick={() => addDraftItem("return")}>
+            <Button variant="outline" onClick={addDraftItem}>
               Add Item
             </Button>
           </div>
-          {renderItemRows(returnDraftItems, "return")}
+          {renderItemRows(returnDraftItems)}
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold">Replacement Items</h3>
-            <Button
-              variant="outline"
-              onClick={() => addDraftItem("replacement")}
-            >
-              Add Item
-            </Button>
-          </div>
-          {renderItemRows(replacementDraftItems, "replacement")}
-        </div>
-
-        <div className="grid gap-3 rounded-lg border border-border/80 p-3 text-sm md:grid-cols-3">
+        <div className="grid gap-3 rounded-lg border border-border/80 p-3 text-sm md:grid-cols-2">
           <div>
-            <p className="text-xs text-muted-foreground">Return Total</p>
+            <p className="text-xs text-muted-foreground">Revenue Reversed</p>
             <p className="text-base font-semibold">{formatCurrency(returnTotal)}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Replacement Total</p>
-            <p className="text-base font-semibold">
-              {formatCurrency(replacementTotal)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Status</p>
-            <p
-              className={
-                replacementWithinReturn
-                  ? "text-base font-semibold text-emerald-600"
-                  : "text-base font-semibold text-destructive"
-              }
-            >
-              {replacementWithinReturn
-                ? "Replacement within return"
-                : "Replacement exceeds return"}
+            <p className="text-xs text-muted-foreground">Inventory Effect</p>
+            <p className="text-base font-semibold text-emerald-600">
+              Returned products go back into stock
             </p>
           </div>
         </div>
@@ -462,8 +381,7 @@ export function ReturnsManager({
           <TableRow>
             <TableHead>Time</TableHead>
             <TableHead>Returned Items</TableHead>
-            <TableHead>Replacement Items</TableHead>
-            <TableHead>Total</TableHead>
+            <TableHead>Revenue Reversed</TableHead>
             <TableHead>Logged By</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -471,7 +389,7 @@ export function ReturnsManager({
         <TableBody>
           {paginatedReturns.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-muted-foreground">
+              <TableCell colSpan={5} className="text-muted-foreground">
                 No returns recorded yet.
               </TableCell>
             </TableRow>
@@ -483,18 +401,6 @@ export function ReturnsManager({
                   <div className="space-y-1">
                     {entry.returnItems.map((item, index) => (
                       <p key={`${entry._id}-return-${item.productId}-${index}`}>
-                        <span className="font-medium">{getItemLabel(item)}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {" "}- {item.quantity} {item.unit ?? "pcs"}
-                        </span>
-                      </p>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="space-y-1">
-                    {entry.replacementItems.map((item, index) => (
-                      <p key={`${entry._id}-replacement-${item.productId}-${index}`}>
                         <span className="font-medium">{getItemLabel(item)}</span>
                         <span className="text-xs text-muted-foreground">
                           {" "}- {item.quantity} {item.unit ?? "pcs"}

@@ -6,8 +6,6 @@ import { requireAuth } from "@/lib/auth/middleware"
 import { CreateReturnSchema } from "@/lib/db/validators/return"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 
-const TOTAL_TOLERANCE = 0.01
-
 type ProductDocumentLike = {
   _id: { toString(): string }
   name: string
@@ -56,11 +54,7 @@ export async function POST(request: NextRequest) {
     await connectToDatabase()
 
     const productIds = Array.from(
-      new Set(
-        [...payload.returnItems, ...payload.replacementItems].map(
-          (item) => item.productId
-        )
-      )
+      new Set(payload.returnItems.map((item) => item.productId))
     )
 
     const products = await Product.find({ _id: { $in: productIds } })
@@ -91,52 +85,17 @@ export async function POST(request: NextRequest) {
         sku: product.sku,
         unit: product.unit ?? "pcs",
         quantity: item.quantity,
+        basePrice: product.costPrice ?? product.price,
         unitPrice: item.unitPrice,
         lineTotal,
       }
     })
-
-    let totalReplacementAmount = 0
-    const replacementItems = payload.replacementItems.map((item) => {
-      const product = productMap.get(item.productId) as ProductDocumentLike | undefined
-      if (!product) {
-        throw new Error("Product not found")
-      }
-
-      const lineTotal = item.unitPrice * item.quantity
-      totalReplacementAmount += lineTotal
-
-      return {
-        productId: product._id,
-        name: product.name,
-        sku: product.sku,
-        unit: product.unit ?? "pcs",
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        lineTotal,
-      }
-    })
-
-    if (totalReplacementAmount - totalReturnAmount > TOTAL_TOLERANCE) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Replacement total cannot exceed the return total.",
-        },
-        { status: 400 }
-      )
-    }
 
     const netChanges = new Map<string, number>()
 
     payload.returnItems.forEach((item) => {
       const current = netChanges.get(item.productId) ?? 0
       netChanges.set(item.productId, current + item.quantity)
-    })
-
-    payload.replacementItems.forEach((item) => {
-      const current = netChanges.get(item.productId) ?? 0
-      netChanges.set(item.productId, current - item.quantity)
     })
 
     for (const [productId, change] of netChanges.entries()) {
@@ -154,16 +113,10 @@ export async function POST(request: NextRequest) {
     for (const [productId, change] of netChanges.entries()) {
       if (change === 0) continue
 
-      const result =
-        change < 0
-          ? await Product.updateOne(
-              { _id: productId, quantity: { $gte: -change } },
-              { $inc: { quantity: change } }
-            )
-          : await Product.updateOne(
-              { _id: productId },
-              { $inc: { quantity: change } }
-            )
+      const result = await Product.updateOne(
+        { _id: productId },
+        { $inc: { quantity: change } }
+      )
 
       if (result.modifiedCount !== 1) {
         if (appliedChanges.length > 0) {
@@ -192,9 +145,9 @@ export async function POST(request: NextRequest) {
     try {
       returnRecord = await ReturnTransaction.create({
         returnItems,
-        replacementItems,
+        replacementItems: [],
         totalReturnAmount,
-        totalReplacementAmount,
+        totalReplacementAmount: 0,
         createdBy: session.userId,
         notes: payload.notes ?? "",
       })

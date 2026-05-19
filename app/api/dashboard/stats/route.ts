@@ -37,6 +37,11 @@ type DashboardRevenueTotal = {
   revenue: number
 }
 
+type DashboardReturnTotals = {
+  revenue: number
+  grossProfit: number
+}
+
 type DashboardTopMovingProduct = {
   _id: {
     sku: string
@@ -96,6 +101,11 @@ export async function GET(request: NextRequest) {
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ])
 
+    const allReturnTotals = await ReturnTransaction.aggregate<DashboardMoneyTotal>([
+      { $unwind: "$returnItems" },
+      { $group: { _id: null, total: { $sum: "$returnItems.lineTotal" } } },
+    ])
+
     const stockValue = await Product.aggregate<DashboardMoneyTotal>([
       { $match: {} },
       {
@@ -146,75 +156,47 @@ export async function GET(request: NextRequest) {
       },
     ])
 
-    const todayReturnCosts = await ReturnTransaction.aggregate<{
-      _id: null
-      returnCost: number
-      replacementCost: number
-    }>([
+    const todayReturnTotals = await ReturnTransaction.aggregate<DashboardReturnTotals>([
       { $match: { createdAt: { $gte: today.start, $lt: today.end } } },
+      { $unwind: "$returnItems" },
       {
-        $facet: {
-          returnCosts: [
-            { $unwind: "$returnItems" },
-            {
-              $lookup: {
-                from: "products",
-                localField: "returnItems.productId",
-                foreignField: "_id",
-                as: "product",
-              },
-            },
-            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
-            {
-              $group: {
-                _id: null,
-                total: {
-                  $sum: {
-                    $multiply: [
-                      "$returnItems.quantity",
-                      { $ifNull: ["$product.costPrice", 0] },
-                    ],
-                  },
+        $lookup: {
+          from: "products",
+          localField: "returnItems.productId",
+          foreignField: "_id",
+          as: "product",
+        },
+      },
+      { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: null,
+          revenue: { $sum: "$returnItems.lineTotal" },
+          grossProfit: {
+            $sum: {
+              $subtract: [
+                "$returnItems.lineTotal",
+                {
+                  $multiply: [
+                    {
+                      $ifNull: [
+                        "$returnItems.basePrice",
+                        { $ifNull: ["$product.costPrice", "$returnItems.unitPrice"] },
+                      ],
+                    },
+                    "$returnItems.quantity",
+                  ],
                 },
-              },
+              ],
             },
-          ],
-          replacementCosts: [
-            { $unwind: "$replacementItems" },
-            {
-              $lookup: {
-                from: "products",
-                localField: "replacementItems.productId",
-                foreignField: "_id",
-                as: "product",
-              },
-            },
-            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
-            {
-              $group: {
-                _id: null,
-                total: {
-                  $sum: {
-                    $multiply: [
-                      "$replacementItems.quantity",
-                      { $ifNull: ["$product.costPrice", 0] },
-                    ],
-                  },
-                },
-              },
-            },
-          ],
+          },
         },
       },
       {
         $project: {
           _id: null,
-          returnCost: {
-            $ifNull: [{ $arrayElemAt: ["$returnCosts.total", 0] }, 0],
-          },
-          replacementCost: {
-            $ifNull: [{ $arrayElemAt: ["$replacementCosts.total", 0] }, 0],
-          },
+          revenue: 1,
+          grossProfit: 1,
         },
       },
     ])
@@ -261,8 +243,46 @@ export async function GET(request: NextRequest) {
         },
       },
       { $sort: { soldQuantity: -1 } },
-      { $limit: 6 },
     ])
+
+    const returnedTopMoving =
+      await ReturnTransaction.aggregate<DashboardTopMovingProduct>([
+        { $match: {} },
+        { $unwind: "$returnItems" },
+        {
+          $group: {
+            _id: {
+              sku: "$returnItems.sku",
+              name: "$returnItems.name",
+              unit: "$returnItems.unit",
+            },
+            soldQuantity: { $sum: "$returnItems.quantity" },
+            salesValue: { $sum: "$returnItems.lineTotal" },
+          },
+        },
+      ])
+
+    const topMovingBySku = new Map<string, DashboardTopMovingProduct>()
+    topMoving.forEach((entry) => {
+      topMovingBySku.set(entry._id.sku, { ...entry })
+    })
+    returnedTopMoving.forEach((entry) => {
+      const current = topMovingBySku.get(entry._id.sku) ?? {
+        _id: entry._id,
+        soldQuantity: 0,
+        salesValue: 0,
+      }
+
+      topMovingBySku.set(entry._id.sku, {
+        ...current,
+        soldQuantity: current.soldQuantity - entry.soldQuantity,
+        salesValue: current.salesValue - entry.salesValue,
+      })
+    })
+    const netTopMoving = Array.from(topMovingBySku.values())
+      .filter((entry) => entry.soldQuantity !== 0 || entry.salesValue !== 0)
+      .sort((a, b) => b.soldQuantity - a.soldQuantity)
+      .slice(0, 6)
 
     return NextResponse.json({
       success: true,
@@ -274,13 +294,15 @@ export async function GET(request: NextRequest) {
         invoiceCount,
         unpaidCount,
         stockValue: stockValue[0]?.total || 0,
-        revenue: sales[0]?.total || 0,
-        revenueToday: todaySalesTotals[0]?.revenue || 0,
-        grossProfitToday: todayGrossProfit[0]?.total || 0,
+        revenue: (sales[0]?.total || 0) - (allReturnTotals[0]?.total || 0),
+        revenueToday:
+          (todaySalesTotals[0]?.revenue || 0) -
+          (todayReturnTotals[0]?.revenue || 0),
+        grossProfitToday:
+          (todayGrossProfit[0]?.total || 0) -
+          (todayReturnTotals[0]?.grossProfit || 0),
         expensesToday: todayExpenses[0]?.total || 0,
-        returnCostToday:
-          (todayReturnCosts[0]?.returnCost || 0) -
-          (todayReturnCosts[0]?.replacementCost || 0),
+        returnCostToday: 0,
         outstandingAmount: unpaidTotals[0]?.total || 0,
         lowStockProducts: lowStockProducts.map((product) => ({
           _id: product._id.toString(),
@@ -299,7 +321,7 @@ export async function GET(request: NextRequest) {
             new Set(sale.items.map((item) => item.unit ?? "pcs"))
           ),
         })),
-        topMoving: topMoving.map((entry) => ({
+        topMoving: netTopMoving.map((entry) => ({
           sku: entry._id.sku,
           name: entry._id.name,
           unit: entry._id.unit ?? "pcs",

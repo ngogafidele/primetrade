@@ -28,10 +28,8 @@ type ReturnPageEntry = {
   updatedAt?: Date
   createdBy?: PopulatedReturnUser | { toString(): string }
   totalReturnAmount: number
-  totalReplacementAmount: number
   notes: string
   returnItems: ReturnPageItem[]
-  replacementItems: ReturnPageItem[]
 }
 
 type ReturnPageProduct = {
@@ -61,37 +59,43 @@ export default async function ReturnsPage() {
     .sort({ name: 1 })
     .lean<ReturnPageProduct[]>()
 
-  const serializedReturns = returns.map((entry) => ({
-    ...entry,
-    _id: entry._id.toString(),
-    createdAt: entry.createdAt?.toISOString(),
-    createdAtLabel: entry.createdAt
-      ? formatInKigali(entry.createdAt, {
-          year: "numeric",
-          month: "short",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: true,
-        })
-      : "-",
-    updatedAt: entry.updatedAt?.toISOString(),
-    createdBy: isPopulatedReturnUser(entry.createdBy)
+  const serializedReturns = returns.map((entry) => {
+    const createdBy = isPopulatedReturnUser(entry.createdBy)
       ? entry.createdBy._id.toString()
-      : entry.createdBy?.toString(),
-    createdByName: isPopulatedReturnUser(entry.createdBy)
-      ? entry.createdBy.name ?? entry.createdBy.email ?? "Unknown User"
-      : "Unknown User",
-    returnItems: entry.returnItems.map((item) => ({
-      ...item,
-      productId: item.productId.toString(),
-    })),
-    replacementItems: entry.replacementItems.map((item) => ({
-      ...item,
-      productId: item.productId.toString(),
-    })),
-  }))
+      : entry.createdBy?.toString()
+
+    return {
+      _id: entry._id.toString(),
+      createdAt: entry.createdAt?.toISOString(),
+      createdAtLabel: entry.createdAt
+        ? formatInKigali(entry.createdAt, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
+          })
+        : "-",
+      updatedAt: entry.updatedAt?.toISOString(),
+      createdBy,
+      createdByName: isPopulatedReturnUser(entry.createdBy)
+        ? entry.createdBy.name ?? entry.createdBy.email ?? "Unknown User"
+        : "Unknown User",
+      totalReturnAmount: entry.totalReturnAmount,
+      notes: entry.notes,
+      returnItems: entry.returnItems.map((item) => ({
+        productId: item.productId.toString(),
+        name: item.name,
+        sku: item.sku,
+        unit: item.unit ?? "pcs",
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal,
+      })),
+    }
+  })
 
   const serializedProducts = products.map((product) => ({
     _id: product._id.toString(),

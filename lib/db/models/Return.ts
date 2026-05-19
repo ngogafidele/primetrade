@@ -7,6 +7,7 @@ const ReturnItemSchema = new Schema(
     sku: { type: String, required: true },
     unit: { type: String, required: true, default: "pcs" },
     quantity: { type: Number, required: true, min: 1 },
+    basePrice: { type: Number, required: true, min: 0, default: 0 },
     unitPrice: { type: Number, required: true, min: 0 },
     lineTotal: { type: Number, required: true, min: 0 },
   },
@@ -16,9 +17,9 @@ const ReturnItemSchema = new Schema(
 const ReturnSchema = new Schema(
   {
     returnItems: { type: [ReturnItemSchema], required: true },
-    replacementItems: { type: [ReturnItemSchema], required: true },
+    replacementItems: { type: [ReturnItemSchema], default: [] },
     totalReturnAmount: { type: Number, required: true, min: 0 },
-    totalReplacementAmount: { type: Number, required: true, min: 0 },
+    totalReplacementAmount: { type: Number, required: true, min: 0, default: 0 },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     notes: { type: String, default: "" },
   },

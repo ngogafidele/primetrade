@@ -12,7 +12,6 @@ export const ReturnItemSchema = z
 export const CreateReturnSchema = z
   .object({
     returnItems: z.array(ReturnItemSchema).min(1),
-    replacementItems: z.array(ReturnItemSchema).min(1),
     notes: z.string().optional(),
   })
   .strict()

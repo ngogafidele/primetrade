@@ -88,10 +88,10 @@ type ExpenseTotals = {
   expenses: number
 }
 
-type ReturnCostTotals = {
+type ReturnImpactTotals = {
   _id: null
-  returnCost: number
-  replacementCost: number
+  revenue: number
+  grossProfit: number
 }
 
 type SearchParams = Promise<{
@@ -107,6 +107,8 @@ type TopMovingProduct = {
   revenue: number
   grossProfit: number
 }
+
+type ReturnProductImpact = TopMovingProduct
 
 type RecentSale = {
   _id: string
@@ -261,9 +263,10 @@ export default async function ReportsPage({
     adjustmentTotals,
     expenseTotals,
     outstandingSalesTotals,
-    returnCostTotals,
+    returnImpactTotals,
     paymentTotals,
     topMovingProducts,
+    returnedProductImpacts,
     recentSales,
   ] = await Promise.all([
     Product.aggregate<ProductTotals>([
@@ -352,71 +355,47 @@ export default async function ReportsPage({
         },
       },
     ]),
-    ReturnTransaction.aggregate<ReturnCostTotals>([
+    ReturnTransaction.aggregate<ReturnImpactTotals>([
       { $match: { createdAt: periodFilter } },
+      { $unwind: "$returnItems" },
       {
-        $facet: {
-          returnCosts: [
-            { $unwind: "$returnItems" },
-            {
-              $lookup: {
-                from: "products",
-                localField: "returnItems.productId",
-                foreignField: "_id",
-                as: "product",
-              },
-            },
-            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
-            {
-              $group: {
-                _id: null,
-                total: {
-                  $sum: {
-                    $multiply: [
-                      "$returnItems.quantity",
-                      { $ifNull: ["$product.costPrice", 0] },
-                    ],
-                  },
+        $lookup: {
+          from: "products",
+          localField: "returnItems.productId",
+          foreignField: "_id",
+          as: "product",
+        },
+      },
+      { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: null,
+          revenue: { $sum: "$returnItems.lineTotal" },
+          grossProfit: {
+            $sum: {
+              $subtract: [
+                "$returnItems.lineTotal",
+                {
+                  $multiply: [
+                    {
+                      $ifNull: [
+                        "$returnItems.basePrice",
+                        { $ifNull: ["$product.costPrice", "$returnItems.unitPrice"] },
+                      ],
+                    },
+                    "$returnItems.quantity",
+                  ],
                 },
-              },
+              ],
             },
-          ],
-          replacementCosts: [
-            { $unwind: "$replacementItems" },
-            {
-              $lookup: {
-                from: "products",
-                localField: "replacementItems.productId",
-                foreignField: "_id",
-                as: "product",
-              },
-            },
-            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
-            {
-              $group: {
-                _id: null,
-                total: {
-                  $sum: {
-                    $multiply: [
-                      "$replacementItems.quantity",
-                      { $ifNull: ["$product.costPrice", 0] },
-                    ],
-                  },
-                },
-              },
-            },
-          ],
+          },
         },
       },
       {
         $project: {
           _id: null,
-          returnCost: {
-            $ifNull: [{ $arrayElemAt: ["$returnCosts.total", 0] }, 0],
-          },
-          replacementCost: {
-            $ifNull: [{ $arrayElemAt: ["$replacementCosts.total", 0] }, 0],
-          },
+          revenue: 1,
+          grossProfit: 1,
         },
       },
     ]),
@@ -472,7 +451,59 @@ export default async function ReportsPage({
         },
       },
       { $sort: { revenue: -1 } },
-      { $limit: 8 },
+      {
+        $project: {
+          _id: 0,
+          sku: "$_id.sku",
+          name: "$_id.name",
+          unit: "$_id.unit",
+          soldQuantity: 1,
+          revenue: 1,
+          grossProfit: 1,
+        },
+      },
+    ]),
+    ReturnTransaction.aggregate<ReturnProductImpact>([
+      { $match: { createdAt: periodFilter } },
+      { $unwind: "$returnItems" },
+      {
+        $lookup: {
+          from: "products",
+          localField: "returnItems.productId",
+          foreignField: "_id",
+          as: "product",
+        },
+      },
+      { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: {
+            sku: "$returnItems.sku",
+            name: "$returnItems.name",
+            unit: "$returnItems.unit",
+          },
+          soldQuantity: { $sum: "$returnItems.quantity" },
+          revenue: { $sum: "$returnItems.lineTotal" },
+          grossProfit: {
+            $sum: {
+              $subtract: [
+                "$returnItems.lineTotal",
+                {
+                  $multiply: [
+                    {
+                      $ifNull: [
+                        "$returnItems.basePrice",
+                        { $ifNull: ["$product.costPrice", "$returnItems.unitPrice"] },
+                      ],
+                    },
+                    "$returnItems.quantity",
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
       {
         $project: {
           _id: 0,
@@ -497,12 +528,13 @@ export default async function ReportsPage({
     inventoryCost: productTotals[0]?.inventoryCost ?? 0,
     inventoryRetail: productTotals[0]?.inventoryRetail ?? 0,
     sales: saleTotals[0]?.sales ?? 0,
-    revenue: saleTotals[0]?.revenue ?? 0,
-    grossProfit: saleTotals[0]?.grossProfit ?? 0,
+    revenue:
+      (saleTotals[0]?.revenue ?? 0) - (returnImpactTotals[0]?.revenue ?? 0),
+    grossProfit:
+      (saleTotals[0]?.grossProfit ?? 0) -
+      (returnImpactTotals[0]?.grossProfit ?? 0),
     expenses: expenseTotals[0]?.expenses ?? 0,
-    returnCostImpact:
-      (returnCostTotals[0]?.returnCost ?? 0) -
-      (returnCostTotals[0]?.replacementCost ?? 0),
+    returnCostImpact: 0,
     revenueCash: paymentTotals.find((entry) => entry._id === "cash")?.total ?? 0,
     revenueMobileMoney:
       paymentTotals.find((entry) => entry._id === "mobile-money")?.total ?? 0,
@@ -516,6 +548,36 @@ export default async function ReportsPage({
   }
 
   const reports = [report]
+  const topMovingBySku = new Map<string, TopMovingProduct>()
+  topMovingProducts.forEach((product) => {
+    topMovingBySku.set(product.sku, { ...product })
+  })
+  returnedProductImpacts.forEach((returnedProduct) => {
+    const current = topMovingBySku.get(returnedProduct.sku) ?? {
+      sku: returnedProduct.sku,
+      name: returnedProduct.name,
+      unit: returnedProduct.unit,
+      soldQuantity: 0,
+      revenue: 0,
+      grossProfit: 0,
+    }
+
+    topMovingBySku.set(returnedProduct.sku, {
+      ...current,
+      soldQuantity: current.soldQuantity - returnedProduct.soldQuantity,
+      revenue: current.revenue - returnedProduct.revenue,
+      grossProfit: current.grossProfit - returnedProduct.grossProfit,
+    })
+  })
+  const netTopMovingProducts = Array.from(topMovingBySku.values())
+    .filter(
+      (product) =>
+        product.soldQuantity !== 0 ||
+        product.revenue !== 0 ||
+        product.grossProfit !== 0
+    )
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 8)
 
   const totals = sumReports(reports)
   const fromLabel = formatDateOnly(range.from)
@@ -591,7 +653,7 @@ export default async function ReportsPage({
             fromLabel={fromLabel}
             toLabel={toLabel}
             reports={reports}
-            topMovingProducts={topMovingProducts}
+            topMovingProducts={netTopMovingProducts}
             recentSales={printableRecentSales}
           />
         </div>
@@ -702,14 +764,14 @@ export default async function ReportsPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {topMovingProducts.length === 0 ? (
+              {netTopMovingProducts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-muted-foreground">
                     No sales movement yet.
                   </TableCell>
                 </TableRow>
               ) : (
-                topMovingProducts.map((product) => (
+                netTopMovingProducts.map((product) => (
                   <TableRow key={product.sku}>
                     <TableCell>
                       <p className="font-medium">{product.name}</p>
