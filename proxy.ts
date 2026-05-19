@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { getCurrentSession } from "@/lib/auth/active-session"
 import {
   AUTH_COOKIE,
   createToken,
@@ -25,13 +26,18 @@ function clearAuthCookie(response: NextResponse) {
   })
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE)?.value
   if (!token) {
     return NextResponse.next()
   }
 
-  const session = verifyToken(token)
+  const verifiedSession = verifyToken(token)
+  const session = await getCurrentSession(verifiedSession).catch((error) => {
+    console.error("[Proxy Auth Error]", error)
+    return null
+  })
+
   if (!session) {
     const response = request.nextUrl.pathname.startsWith("/api/")
       ? NextResponse.json(
