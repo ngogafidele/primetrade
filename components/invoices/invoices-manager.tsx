@@ -389,7 +389,7 @@ export function InvoicesManager({
               font-size: 18px;
             }
             .thanks {
-              margin-top: 28px;
+              margin-top: 44px;
               text-align: center;
               color: #000000;
               font-size: 14px;

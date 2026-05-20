@@ -18,6 +18,10 @@ const ProductSchema = new Schema(
 )
 
 ProductSchema.index({ sku: 1 }, { unique: true })
+ProductSchema.index(
+  { name: 1 },
+  { unique: true, collation: { locale: "en", strength: 2 } }
+)
 
 export type ProductDocument = mongoose.InferSchemaType<typeof ProductSchema>
 

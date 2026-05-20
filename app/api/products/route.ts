@@ -4,24 +4,36 @@ import { Product } from "@/lib/db/models/Product"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
 import { CreateProductSchema } from "@/lib/db/validators/product"
 import { syncLowStockAlert } from "@/lib/db/alerts"
+import {
+  duplicateKeyIncludes,
+  isDuplicateKeyError,
+  productNameExists,
+} from "@/lib/db/products"
 import { ZodError } from "zod"
 
-function getSkuBase(name: string) {
-  const normalized = name.toUpperCase().replace(/[^A-Z0-9]+/g, "")
-  return (normalized.slice(0, 6) || "PRD").padEnd(3, "X")
+function getSkuPrefix(name: string) {
+  const letters = name.toUpperCase().replace(/[^A-Z]+/g, "")
+  return (letters.slice(0, 3) || "PRD").padEnd(3, "X")
 }
 
 async function generateProductSku(name: string) {
-  const base = getSkuBase(name)
+  const prefix = getSkuPrefix(name)
+  const skuPattern = `^${prefix}-\\d{4}$`
+  const latestProduct = await Product.findOne({ sku: { $regex: skuPattern } })
+    .sort({ sku: -1 })
+    .select("sku")
+    .lean<{ sku?: string }>()
 
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase()
-    const sku = `${base}-${suffix}`
+  const latestSku = latestProduct?.sku
+  const latestSequence = latestSku ? Number(latestSku.slice(-4)) : 0
+
+  for (let sequence = latestSequence + 1; sequence <= 9999; sequence += 1) {
+    const sku = `${prefix}-${String(sequence).padStart(4, "0")}`
     const existing = await Product.exists({ sku })
     if (!existing) return sku
   }
 
-  return `${base}-${Date.now().toString(36).toUpperCase()}`
+  throw new Error(`No available SKU sequence for prefix ${prefix}`)
 }
 
 export async function GET(request: NextRequest) {
@@ -61,6 +73,13 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase()
 
+    if (await productNameExists(payload.name)) {
+      return NextResponse.json(
+        { success: false, error: "A product with this name already exists" },
+        { status: 409 }
+      )
+    }
+
     const product = await Product.create({
       ...productInput,
       sku: await generateProductSku(payload.name),
@@ -83,6 +102,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: error.issues[0]?.message ?? "Invalid input" },
         { status: 400 }
+      )
+    }
+    if (isDuplicateKeyError(error)) {
+      const message = duplicateKeyIncludes(error, "name")
+        ? "A product with this name already exists"
+        : "A product with this SKU already exists. Please try again."
+
+      return NextResponse.json(
+        { success: false, error: message },
+        { status: 409 }
       )
     }
     return NextResponse.json(

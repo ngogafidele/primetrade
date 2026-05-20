@@ -88,6 +88,7 @@ const businessFooterLines = [
 ]
 
 const thankYouMessage = "Thank You For Doing Business with Prime Trade Company Ltd"
+const thankYouFooterOffset = 64
 
 const printColor = {
   text: "#000000",
@@ -314,7 +315,7 @@ function writeInvoicePdf(
       .font("Helvetica-Bold")
       .fontSize(10)
       .fillColor(printColor.text)
-      .text(thankYouMessage, 170, footerY + 48, {
+      .text(thankYouMessage, 170, footerY + thankYouFooterOffset, {
         align: "center",
         width: 260,
       })
