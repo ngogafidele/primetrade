@@ -138,6 +138,21 @@ export async function GET(request: NextRequest) {
       },
     ])
 
+    const todayCostTotals = await Sale.aggregate<DashboardMoneyTotal>([
+      { $match: todayFilter },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: null,
+          total: {
+            $sum: {
+              $multiply: ["$items.basePrice", "$items.quantity"],
+            },
+          },
+        },
+      },
+    ])
+
     const todayGrossProfit = await Sale.aggregate<DashboardMoneyTotal>([
       { $match: todayFilter },
       { $unwind: "$items" },
@@ -284,6 +299,12 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.soldQuantity - a.soldQuantity)
       .slice(0, 6)
 
+    const returnCostToday =
+      (todayReturnTotals[0]?.revenue || 0) -
+      (todayReturnTotals[0]?.grossProfit || 0)
+    const costOfSalesToday =
+      (todayCostTotals[0]?.total || 0) - returnCostToday
+
     return NextResponse.json({
       success: true,
       data: {
@@ -298,11 +319,12 @@ export async function GET(request: NextRequest) {
         revenueToday:
           (todaySalesTotals[0]?.revenue || 0) -
           (todayReturnTotals[0]?.revenue || 0),
+        costOfSalesToday,
         grossProfitToday:
           (todayGrossProfit[0]?.total || 0) -
           (todayReturnTotals[0]?.grossProfit || 0),
         expensesToday: todayExpenses[0]?.total || 0,
-        returnCostToday: 0,
+        returnCostToday,
         outstandingAmount: unpaidTotals[0]?.total || 0,
         lowStockProducts: lowStockProducts.map((product) => ({
           _id: product._id.toString(),

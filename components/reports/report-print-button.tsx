@@ -12,6 +12,7 @@ type ReportSummary = {
   sales: number
   revenue: number
   grossProfit: number
+  costOfSales: number
   expenses: number
   returnCostImpact: number
   revenueCash: number
@@ -87,6 +88,7 @@ function sumReports(reports: ReportSummary[]) {
       sales: total.sales + report.sales,
       revenue: total.revenue + report.revenue,
       grossProfit: total.grossProfit + report.grossProfit,
+      costOfSales: total.costOfSales + report.costOfSales,
       expenses: total.expenses + report.expenses,
       returnCostImpact: total.returnCostImpact + report.returnCostImpact,
       revenueCash: total.revenueCash + report.revenueCash,
@@ -105,6 +107,7 @@ function sumReports(reports: ReportSummary[]) {
       sales: 0,
       revenue: 0,
       grossProfit: 0,
+      costOfSales: 0,
       expenses: 0,
       returnCostImpact: 0,
       revenueCash: 0,

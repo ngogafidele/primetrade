@@ -34,6 +34,7 @@ type ReportSummary = {
   sales: number
   revenue: number
   grossProfit: number
+  costOfSales: number
   expenses: number
   returnCostImpact: number
   revenueCash: number
@@ -206,6 +207,7 @@ function sumReports(reports: ReportSummary[]) {
       sales: total.sales + report.sales,
       revenue: total.revenue + report.revenue,
       grossProfit: total.grossProfit + report.grossProfit,
+      costOfSales: total.costOfSales + report.costOfSales,
       expenses: total.expenses + report.expenses,
       returnCostImpact: total.returnCostImpact + report.returnCostImpact,
       revenueCash: total.revenueCash + report.revenueCash,
@@ -224,6 +226,7 @@ function sumReports(reports: ReportSummary[]) {
       sales: 0,
       revenue: 0,
       grossProfit: 0,
+      costOfSales: 0,
       expenses: 0,
       returnCostImpact: 0,
       revenueCash: 0,
@@ -523,16 +526,20 @@ export default async function ReportsPage({
       .lean<RecentSale[]>(),
   ])
 
+  const revenue =
+    (saleTotals[0]?.revenue ?? 0) - (returnImpactTotals[0]?.revenue ?? 0)
+  const grossProfit =
+    (saleTotals[0]?.grossProfit ?? 0) -
+    (returnImpactTotals[0]?.grossProfit ?? 0)
+
   const report: ReportSummary = {
     products: productTotals[0]?.products ?? 0,
     inventoryCost: productTotals[0]?.inventoryCost ?? 0,
     inventoryRetail: productTotals[0]?.inventoryRetail ?? 0,
     sales: saleTotals[0]?.sales ?? 0,
-    revenue:
-      (saleTotals[0]?.revenue ?? 0) - (returnImpactTotals[0]?.revenue ?? 0),
-    grossProfit:
-      (saleTotals[0]?.grossProfit ?? 0) -
-      (returnImpactTotals[0]?.grossProfit ?? 0),
+    revenue,
+    grossProfit,
+    costOfSales: revenue - grossProfit,
     expenses: expenseTotals[0]?.expenses ?? 0,
     returnCostImpact: 0,
     revenueCash: paymentTotals.find((entry) => entry._id === "cash")?.total ?? 0,
@@ -596,13 +603,14 @@ export default async function ReportsPage({
 
   const cards = [
     { label: "Total Revenue", value: formatCurrency(totals.revenue) },
+    { label: "Cost of Sales", value: formatCurrency(totals.costOfSales) },
+    { label: "Expenses", value: formatCurrency(totals.expenses) },
     {
       label: "Profit",
       value: formatCurrency(
         totals.grossProfit - totals.expenses + totals.returnCostImpact
       ),
     },
-    { label: "Expenses", value: formatCurrency(totals.expenses) },
     { label: "Inventory Cost", value: formatCurrency(totals.inventoryCost) },
     { label: "Inventory Retail", value: formatCurrency(totals.inventoryRetail) },
     { label: "Sales Records", value: formatNumber(totals.sales) },

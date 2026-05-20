@@ -8,6 +8,7 @@ import {
   ReceiptText,
   Scale,
   TrendingUp,
+  Wallet,
   Warehouse,
 } from "lucide-react"
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton"
@@ -29,6 +30,7 @@ type StatsResponse = {
   salesToday: number
   stockValue: number
   revenueToday: number
+  costOfSalesToday: number
   grossProfitToday: number
   expensesToday: number
   returnCostToday: number
@@ -94,6 +96,11 @@ export function DashboardStats() {
       label: "Revenue Today",
       value: formatCurrency(stats.revenueToday),
       icon: Coins,
+    },
+    {
+      label: "Cost of Sales Today",
+      value: formatCurrency(stats.costOfSalesToday),
+      icon: Wallet,
     },
     {
       label: "Expenses Today",

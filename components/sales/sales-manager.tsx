@@ -123,6 +123,15 @@ export function SalesManager({
   const [outstandingError, setOutstandingError] = useState<string | null>(null)
   const [invoicedSaleIds, setInvoicedSaleIds] = useState<string[]>([])
 
+  const draftTotal = useMemo(() => {
+    return draftItems.reduce((sum, item) => {
+      const quantity = Number(item.quantity)
+      const price = Number(item.sellingPrice)
+      if (Number.isNaN(quantity) || Number.isNaN(price)) return sum
+      return sum + quantity * price
+    }, 0)
+  }, [draftItems])
+
   const productMap = useMemo(
     () => new Map(products.map((product) => [product._id, product])),
     [products]
@@ -547,6 +556,15 @@ export function SalesManager({
             placeholder="Any note for this sale"
           />
         </label>
+
+        <div className="rounded-lg border border-border/80 bg-muted/40 px-4 py-3 text-sm">
+          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            Total to pay
+          </p>
+          <p className="mt-1 text-lg font-semibold">
+            {formatCurrency(draftTotal)}
+          </p>
+        </div>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
