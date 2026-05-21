@@ -384,7 +384,7 @@ export function ReportPrintButton({
             <div class="metric"><span>Inventory Retail</span><strong>${escapeHtml(formatCurrency(totals.inventoryRetail))}</strong></div>
             <div class="metric"><span>Sales Records</span><strong>${escapeHtml(formatNumber(totals.sales))}</strong></div>
             <div class="metric"><span>Products</span><strong>${escapeHtml(formatNumber(totals.products))}</strong></div>
-            <div class="${outstandingSalesClass}"><span>Outstanding Sales</span><strong>${escapeHtml(formatCurrency(totals.outstandingSales))}</strong></div>
+            <div class="${outstandingSalesClass}"><span>Loan Sales</span><strong>${escapeHtml(formatCurrency(totals.outstandingSales))}</strong></div>
           </div>
 
           <div class="section-grid">
@@ -401,7 +401,7 @@ export function ReportPrintButton({
                     <th>Bank</th>
                     <th>Sales</th>
                     <th>Products</th>
-                    <th>Outstanding Sales</th>
+                    <th>Loan Sales</th>
                   </tr>
                 </thead>
                 <tbody>

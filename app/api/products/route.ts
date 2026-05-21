@@ -11,7 +11,17 @@ import {
   productNameExists,
 } from "@/lib/db/products"
 import { parseKigaliDateInput } from "@/lib/utils/time"
+import {
+  serializeProduct,
+  serializeProductSupply,
+} from "@/lib/products/serialization"
 import { ZodError } from "zod"
+
+type LatestProductSupply = {
+  _id: { toString(): string }
+  supplierName: string
+  suppliedAt?: Date
+}
 
 function getSkuPrefix(name: string) {
   const letters = name.toUpperCase().replace(/[^A-Z]+/g, "")
@@ -49,9 +59,34 @@ export async function GET(request: NextRequest) {
     }
 
     await connectToDatabase()
-    const products = await Product.find()
+    const [products, latestSupplies] = await Promise.all([
+      Product.find().lean(),
+      ProductSupply.aggregate<LatestProductSupply>([
+        { $sort: { suppliedAt: -1, createdAt: -1 } },
+        {
+          $group: {
+            _id: "$productId",
+            supplierName: { $first: "$supplierName" },
+            suppliedAt: { $first: "$suppliedAt" },
+          },
+        },
+      ]),
+    ])
+    const latestSupplyByProductId = new Map(
+      latestSupplies.map((supply) => [supply._id.toString(), supply])
+    )
 
-    return NextResponse.json({ success: true, data: products })
+    return NextResponse.json({
+      success: true,
+      data: products.map((product) => {
+        const latestSupply = latestSupplyByProductId.get(product._id.toString())
+        return serializeProduct({
+          ...product,
+          supplierName: latestSupply?.supplierName,
+          lastRestockAt: latestSupply?.suppliedAt,
+        })
+      }),
+    })
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch products" },
@@ -125,7 +160,15 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(
-      { success: true, data: product, supply },
+      {
+        success: true,
+        data: serializeProduct({
+          ...product.toObject(),
+          supplierName: supply?.supplierName,
+          lastRestockAt: supply?.suppliedAt,
+        }),
+        supply: supply ? serializeProductSupply(supply) : null,
+      },
       { status: 201 }
     )
   } catch (error) {

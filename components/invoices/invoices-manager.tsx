@@ -42,6 +42,7 @@ type InvoiceClient = {
   customerName: string
   customerEmail?: string
   customerPhone?: string
+  notes?: string
   totalAmount: number
   status: InvoiceStatus
   issuedAt?: string
@@ -67,6 +68,7 @@ type FormState = {
   customerName: string
   customerEmail: string
   customerPhone: string
+  notes: string
   status: InvoiceStatus
   dueDate: string
 }
@@ -76,6 +78,7 @@ const emptyForm: FormState = {
   customerName: "",
   customerEmail: "",
   customerPhone: "",
+  notes: "",
   status: "unpaid",
   dueDate: "",
 }
@@ -159,6 +162,7 @@ export function InvoicesManager({
       customerName: invoice.customerName,
       customerEmail: invoice.customerEmail ?? "",
       customerPhone: invoice.customerPhone ?? "",
+      notes: invoice.notes ?? "",
       status: invoice.status,
       dueDate: toDateInputValue(invoice.dueDate),
     })
@@ -185,6 +189,7 @@ export function InvoicesManager({
       customerName: formState.customerName.trim(),
       customerEmail: formState.customerEmail.trim() || undefined,
       customerPhone: formState.customerPhone.trim() || undefined,
+      notes: formState.notes.trim() || undefined,
       status: formState.status,
       dueDate: toDateTimePayload(formState.dueDate),
     }
@@ -354,8 +359,8 @@ export function InvoicesManager({
               font-size: 12px;
             }
             th {
-              background: #d1d5db;
-              color: #000000;
+              background: #1d4ed8;
+              color: #ffffff;
               text-align: left;
               border: 1.5px solid #000000;
               padding: 10px 8px;
@@ -390,8 +395,12 @@ export function InvoicesManager({
             }
             .thanks {
               margin-top: 44px;
+              padding: 10px 12px;
+              width: 100%;
+              background: #1d4ed8;
+              box-sizing: border-box;
               text-align: center;
-              color: #000000;
+              color: #ffffff;
               font-size: 14px;
               font-weight: 700;
             }
@@ -455,6 +464,12 @@ export function InvoicesManager({
               ${rows || '<tr><td colspan="5">No sale items found.</td></tr>'}
             </tbody>
           </table>
+
+          ${
+            invoice.notes
+              ? `<section style="float: left; margin-top: 18px; margin-bottom: 18px; max-width: 52%; font-size: 12px;"><p style="margin: 0 0 6px; font-weight: 700;">Note</p><p style="margin: 0;">${escapeHtml(invoice.notes)}</p></section>`
+              : ""
+          }
 
           <section class="total">
             <div>
@@ -602,6 +617,20 @@ export function InvoicesManager({
                     />
                   </label>
                 </div>
+                <label className="grid gap-1 text-sm">
+                  Notes optional
+                  <textarea
+                    value={formState.notes}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        notes: event.target.value,
+                      }))
+                    }
+                    className="min-h-20 rounded-md border border-border px-3 py-2"
+                    placeholder="Any note for this invoice"
+                  />
+                </label>
                 {error ? (
                   <p className="text-sm text-destructive">{error}</p>
                 ) : null}

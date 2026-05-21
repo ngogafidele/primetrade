@@ -32,6 +32,8 @@ type ProductClient = {
   lowStockThreshold: number
   costPrice: number
   price: number
+  supplierName?: string
+  lastRestockAt?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -109,6 +111,16 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;")
+}
+
+function formatProductDate(value: string | undefined) {
+  if (!value) return "-"
+
+  return formatInKigali(value, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  })
 }
 
 export function ProductsManager({
@@ -396,6 +408,8 @@ export function ProductsManager({
               <span>${escapeHtml(product.sku)}</span>
             </td>
             <td>${escapeHtml(String(product.quantity))} ${escapeHtml(product.unit ?? "pcs")}</td>
+            <td>${escapeHtml(formatProductDate(product.lastRestockAt))}</td>
+            <td>${escapeHtml(product.supplierName || "-")}</td>
             <td>${escapeHtml(String(product.lowStockThreshold ?? 0))}</td>
             <td>${escapeHtml(formatCurrency(product.costPrice ?? 0))}</td>
             <td>${escapeHtml(formatCurrency(product.price))}</td>
@@ -497,6 +511,8 @@ export function ProductsManager({
                 <th>#</th>
                 <th>Product</th>
                 <th>Quantity</th>
+                <th>Last Restock</th>
+                <th>Supplier</th>
                 <th>Low Stock</th>
                 <th>Cost Price</th>
                 <th>Selling Price</th>
@@ -506,7 +522,7 @@ export function ProductsManager({
             <tbody>
               ${
                 rows ||
-                '<tr><td colspan="7">No products found.</td></tr>'
+                '<tr><td colspan="9">No products found.</td></tr>'
               }
             </tbody>
           </table>
@@ -830,6 +846,8 @@ export function ProductsManager({
             <TableHead>SKU</TableHead>
             <TableHead>Quantity</TableHead>
             <TableHead>Unit</TableHead>
+            <TableHead>Last Restock</TableHead>
+            <TableHead>Supplier</TableHead>
             <TableHead>Low Stock Threshold</TableHead>
             <TableHead>Cost Price</TableHead>
             <TableHead>Selling Price</TableHead>
@@ -840,7 +858,7 @@ export function ProductsManager({
           {paginatedProducts.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={isAdmin ? 8 : 7}
+                colSpan={isAdmin ? 10 : 9}
                 className="text-muted-foreground"
               >
                 No products found.
@@ -862,6 +880,8 @@ export function ProductsManager({
                   </div>
                 </TableCell>
                 <TableCell>{product.unit ?? "pcs"}</TableCell>
+                <TableCell>{formatProductDate(product.lastRestockAt)}</TableCell>
+                <TableCell>{product.supplierName || "-"}</TableCell>
                 <TableCell>{product.lowStockThreshold ?? 0}</TableCell>
                 <TableCell>{formatCurrency(product.costPrice ?? 0)}</TableCell>
                 <TableCell>

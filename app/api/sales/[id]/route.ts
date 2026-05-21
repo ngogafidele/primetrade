@@ -80,7 +80,7 @@ export async function PATCH(
 
     if (!sale) {
       return NextResponse.json(
-        { success: false, error: "Outstanding sale not found" },
+        { success: false, error: "Loan sale not found" },
         { status: 404 }
       )
     }

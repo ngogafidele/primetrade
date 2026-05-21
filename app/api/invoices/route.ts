@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
           customerName: payload.customerName,
           customerEmail: payload.customerEmail ?? "",
           customerPhone: payload.customerPhone ?? "",
+          notes: payload.notes ?? "",
           createdBy: session.userId,
           items: sale.items.map((item) => ({
             description: item.name,

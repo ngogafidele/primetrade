@@ -73,6 +73,7 @@ export async function GET(
         customerPhone: invoice.customerPhone ?? "",
         status: invoice.status,
         processedBy,
+        notes: invoice.notes ?? "",
         totalAmount: invoice.totalAmount,
         items,
       },

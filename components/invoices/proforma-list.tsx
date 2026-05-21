@@ -36,6 +36,7 @@ type ProformaInvoice = {
   customerName: string
   customerEmail?: string
   customerPhone?: string
+  notes?: string
   totalAmount: number
   issuedAt?: string
   items: Array<{
@@ -51,6 +52,7 @@ type FormState = {
   customerName: string
   customerEmail: string
   customerPhone: string
+  notes: string
   items: FormItem[]
 }
 
@@ -85,6 +87,7 @@ function createEmptyForm(): FormState {
     customerName: "",
     customerEmail: "",
     customerPhone: "",
+    notes: "",
     items: [createEmptyItem()],
   }
 }
@@ -208,6 +211,7 @@ export function ProformaInvoicesList({
       customerName: proforma.customerName,
       customerEmail: proforma.customerEmail ?? "",
       customerPhone: proforma.customerPhone ?? "",
+      notes: proforma.notes ?? "",
       items:
         proforma.items.length > 0
           ? proforma.items.map((item) => ({
@@ -267,6 +271,7 @@ export function ProformaInvoicesList({
             customerName: formState.customerName.trim(),
             customerEmail: formState.customerEmail.trim() || undefined,
             customerPhone: formState.customerPhone.trim() || undefined,
+            notes: formState.notes.trim() || undefined,
             items,
           }),
         }
@@ -516,6 +521,20 @@ export function ProformaInvoicesList({
               </label>
             </div>
             <div className="grid gap-3">
+              <label className="grid gap-1 text-sm">
+                Notes optional
+                <textarea
+                  value={formState.notes}
+                  onChange={(event) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      notes: event.target.value,
+                    }))
+                  }
+                  className="min-h-20 rounded-md border border-border px-3 py-2"
+                  placeholder="Any note for this proforma"
+                />
+              </label>
               <h3 className="text-sm font-semibold">Items</h3>
 
               <div className="grid gap-3">
@@ -631,6 +650,7 @@ export function ProformaInvoicesList({
               <p>Customer: {detailProforma.customerName}</p>
               <p>Date: {formatDate(detailProforma.issuedAt)}</p>
               <p>Amount: {formatCurrency(detailProforma.totalAmount)}</p>
+              {detailProforma.notes ? <p>Note: {detailProforma.notes}</p> : null}
               <div className="rounded-lg border border-border p-3">
                 {detailProforma.items.map((item, index) => (
                   <p key={`${item.description}-${index}`}>

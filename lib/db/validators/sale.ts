@@ -29,7 +29,7 @@ export const CreateSaleSchema = z
   .refine(
     (value) => value.paymentStatus === "paid" || Boolean(value.outstanding),
     {
-      message: "Outstanding details are required for unpaid sales",
+      message: "Loan details are required for unpaid sales",
       path: ["outstanding"],
     }
   )

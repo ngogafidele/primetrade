@@ -39,6 +39,7 @@ type SalesInvoice = {
   customerName: string
   customerEmail?: string
   customerPhone?: string
+  notes?: string
   totalAmount: number
   status: InvoiceStatus
   issuedAt?: string
@@ -56,6 +57,7 @@ type FormState = {
   customerName: string
   customerEmail: string
   customerPhone: string
+  notes: string
   status: InvoiceStatus
 }
 
@@ -64,6 +66,7 @@ const emptyForm: FormState = {
   customerName: "",
   customerEmail: "",
   customerPhone: "",
+  notes: "",
   status: "unpaid",
 }
 
@@ -157,6 +160,7 @@ export function SalesInvoicesList({
       customerName: invoice.customerName,
       customerEmail: invoice.customerEmail ?? "",
       customerPhone: invoice.customerPhone ?? "",
+      notes: invoice.notes ?? "",
       status: invoice.status,
     })
     setError(null)
@@ -201,6 +205,7 @@ export function SalesInvoicesList({
         customerName: formState.customerName.trim(),
         customerEmail: formState.customerEmail.trim() || undefined,
         customerPhone: formState.customerPhone.trim() || undefined,
+        notes: formState.notes.trim() || undefined,
         status: formState.status,
       }
       const response = await fetch(
@@ -474,6 +479,20 @@ export function SalesInvoicesList({
               />
             </div>
             <label className="grid gap-1 text-sm">
+              Notes optional
+              <textarea
+                value={formState.notes}
+                onChange={(event) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    notes: event.target.value,
+                  }))
+                }
+                className="min-h-20 rounded-md border border-border px-3 py-2"
+                placeholder="Any note for this invoice"
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
               Status
               <Select
                 value={formState.status}
@@ -533,6 +552,7 @@ export function SalesInvoicesList({
               <p>Date: {formatDate(detailInvoice.issuedAt)}</p>
               <p>Amount: {formatCurrency(detailInvoice.totalAmount)}</p>
               <p>Status: {detailInvoice.status}</p>
+              {detailInvoice.notes ? <p>Note: {detailInvoice.notes}</p> : null}
             </div>
           ) : null}
         </DialogContent>

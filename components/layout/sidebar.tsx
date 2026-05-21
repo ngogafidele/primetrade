@@ -27,7 +27,7 @@ const adminOnlyNavItems = [
 const commonNavItems = [
   { href: "/products", label: "Products", icon: PackageSearch },
   { href: "/sales", label: "Sales", icon: ReceiptText },
-  { href: "/outstanding", label: "Outstanding", icon: ScrollText },
+  { href: "/loans", label: "Loans", icon: ScrollText },
   { href: "/returns", label: "Returns", icon: RotateCcw },
   { href: "/expenses", label: "Expenses", icon: Wallet },
   { href: "/invoices", label: "Invoices", icon: ClipboardList },

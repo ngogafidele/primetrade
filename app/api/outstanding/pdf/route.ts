@@ -33,7 +33,7 @@ function buildStatementNumber(id: string | undefined) {
     parts.day
   ).padStart(2, "0")}`
   const suffix = (id ?? "CUSTOMER").slice(-6).toUpperCase()
-  return `OUT-${datePart}-${suffix}`
+  return `LOAN-${datePart}-${suffix}`
 }
 
 function safeFilePart(value: string) {
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
 
     if (sales.length === 0) {
       return NextResponse.json(
-        { success: false, error: "No outstanding records found" },
+        { success: false, error: "No loan records found" },
         { status: 404 }
       )
     }
@@ -107,6 +107,7 @@ export async function GET(request: NextRequest) {
               .map((item) => `${item.name}: ${formatCurrency(item.sellingPrice)}`)
               .join(", ") || "-",
           recordedBy: resolveRecordedBy(sale.createdBy as PopulatedUser),
+          notes: sale.notes ?? "",
           totalAmount: sale.totalAmount,
         })),
       },
@@ -126,13 +127,13 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("[Outstanding PDF Error]", error)
+    console.error("[Loan PDF Error]", error)
     const detail =
       process.env.NODE_ENV !== "production" && error instanceof Error
         ? `: ${error.message}`
         : ""
     return NextResponse.json(
-      { success: false, error: `Failed to generate outstanding PDF${detail}` },
+      { success: false, error: `Failed to generate loan PDF${detail}` },
       { status: 500 }
     )
   }

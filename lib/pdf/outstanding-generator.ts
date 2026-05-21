@@ -28,6 +28,7 @@ type OutstandingPdfItem = {
   items: string
   unitPrices: string
   recordedBy?: string
+  notes?: string
   totalAmount: number
 }
 
@@ -36,6 +37,7 @@ type OutstandingPdfData = {
   generatedAt?: Date | string
   customerName: string
   customerPhone?: string
+  notes?: string
   sales: OutstandingPdfItem[]
   totalAmount: number
 }
@@ -71,6 +73,7 @@ type OutstandingPdfDocument = {
   strokeColor(color: string): OutstandingPdfDocument
   stroke(): OutstandingPdfDocument
   addPage(): OutstandingPdfDocument
+  heightOfString(text: string, options?: { width?: number }): number
 }
 
 const logoPath = path.join(process.cwd(), "public", "images", "logo.png")
@@ -92,7 +95,8 @@ const printColor = {
   text: "#000000",
   muted: "#000000",
   accent: "#000000",
-  headerBackground: "#d1d5db",
+  headerBackground: "#1d4ed8",
+  headerText: "#ffffff",
   rowBackground: "#eeeeee",
   rule: "#000000",
 }
@@ -153,7 +157,7 @@ export async function generateOutstandingCustomerPDF(
     .fillColor(printColor.text)
     .font("Helvetica-Bold")
     .fontSize(22)
-    .text("Outstanding Statement", headerRightColumn.x, 52, {
+    .text("Loan Statement", headerRightColumn.x, 52, {
       align: "right",
       width: headerRightColumn.width,
     })
@@ -219,7 +223,7 @@ export async function generateOutstandingCustomerPDF(
     .rect(48, tableTop, 499, 24)
     .fillColor(printColor.headerBackground)
     .fill()
-    .fillColor(printColor.text)
+    .fillColor(printColor.headerText)
     .font("Helvetica-Bold")
     .fontSize(9)
     .text("NO", columns.no, tableTop + 8)
@@ -263,18 +267,43 @@ export async function generateOutstandingCustomerPDF(
     y = 56
   }
 
+  const noteText =
+    data.notes?.trim() ||
+    data.sales
+      .map((sale) => sale.notes?.trim())
+      .filter(Boolean)
+      .join("\n")
+
   doc
     .moveTo(48, y)
     .lineTo(547, y)
     .strokeColor(printColor.rule)
     .stroke()
+
+  let footerY = y + 58
+
+  if (noteText) {
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .fillColor(printColor.text)
+      .text("Note", 48, y + 20)
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor(printColor.muted)
+      .text(noteText, 48, y + 38, { width: 260 })
+
+    const noteHeight = doc.heightOfString(noteText, { width: 260 })
+    footerY = Math.max(footerY, y + 66 + noteHeight)
+  }
+
+  doc
     .font("Helvetica-Bold")
     .fontSize(14)
     .fillColor(printColor.text)
-    .text("Total Outstanding: ", 318, y + 20)
+    .text("Total Loan: ", 318, y + 20)
     .text(formatCurrency(data.totalAmount), 462, y + 20, { width: 78 })
 
-  let footerY = y + 58
   if (footerY > 700) {
     doc.addPage()
     footerY = 56
@@ -287,12 +316,15 @@ export async function generateOutstandingCustomerPDF(
     .text(businessFooterLines.join("\n"), 48, footerY, { width: 220 })
 
   doc
+    .rect(48, footerY + thankYouFooterOffset - 6, 499, 22)
+    .fillColor(printColor.headerBackground)
+    .fill()
     .font("Helvetica-Bold")
     .fontSize(10)
-    .fillColor(printColor.text)
-    .text(thankYouMessage, 170, footerY + thankYouFooterOffset, {
+    .fillColor(printColor.headerText)
+    .text(thankYouMessage, 48, footerY + thankYouFooterOffset, {
       align: "center",
-      width: 260,
+      width: 499,
     })
 
   doc.end()

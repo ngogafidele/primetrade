@@ -60,14 +60,19 @@ export async function PUT(
 
     const { id } = await context.params
     const payload = UpdateInvoiceSchema.parse(await request.json())
+    const updateInput = {
+      ...payload,
+      dueDate: payload.dueDate ? new Date(payload.dueDate) : undefined,
+    }
+
+    if (!("notes" in payload)) {
+      delete updateInput.notes
+    }
 
     await connectToDatabase()
     const invoice = await Invoice.findOneAndUpdate(
       { _id: id },
-      {
-        ...payload,
-        dueDate: payload.dueDate ? new Date(payload.dueDate) : undefined,
-      },
+      updateInput,
       { returnDocument: "after", runValidators: true }
     )
 

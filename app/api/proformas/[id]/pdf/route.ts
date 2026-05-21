@@ -47,6 +47,7 @@ export async function GET(
         customerEmail: proforma.customerEmail ?? "",
         customerPhone: proforma.customerPhone ?? "",
         processedBy,
+        notes: proforma.notes ?? "",
         totalAmount: proforma.totalAmount,
         items: (proforma.items ?? []).map((item) => ({
           description: item.description,

@@ -112,6 +112,7 @@ export async function PUT(
         customerName: payload.customerName,
         customerEmail: payload.customerEmail ?? "",
         customerPhone: payload.customerPhone ?? "",
+        notes: payload.notes ?? "",
         items,
         totalAmount,
         expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : undefined,

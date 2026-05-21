@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
+import { ProductSupply } from "@/lib/db/models/ProductSupply"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
 import { UpdateProductSchema } from "@/lib/db/validators/product"
 import { syncLowStockAlert } from "@/lib/db/alerts"
@@ -9,7 +10,15 @@ import {
   isDuplicateKeyError,
   productNameExists,
 } from "@/lib/db/products"
+import { serializeProduct } from "@/lib/products/serialization"
 import { ZodError } from "zod"
+
+async function getLatestProductSupply(productId: string) {
+  return ProductSupply.findOne({ productId })
+    .sort({ suppliedAt: -1, createdAt: -1 })
+    .select("supplierName suppliedAt")
+    .lean<{ supplierName?: string; suppliedAt?: Date }>()
+}
 
 export async function GET(
   request: NextRequest,
@@ -36,7 +45,16 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ success: true, data: product })
+    const latestSupply = await getLatestProductSupply(id)
+
+    return NextResponse.json({
+      success: true,
+      data: serializeProduct({
+        ...product.toObject(),
+        supplierName: latestSupply?.supplierName,
+        lastRestockAt: latestSupply?.suppliedAt,
+      }),
+    })
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch product" },
@@ -93,7 +111,16 @@ export async function PUT(
       threshold: product.lowStockThreshold ?? 0,
     })
 
-    return NextResponse.json({ success: true, data: product })
+    const latestSupply = await getLatestProductSupply(id)
+
+    return NextResponse.json({
+      success: true,
+      data: serializeProduct({
+        ...product.toObject(),
+        supplierName: latestSupply?.supplierName,
+        lastRestockAt: latestSupply?.suppliedAt,
+      }),
+    })
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json(

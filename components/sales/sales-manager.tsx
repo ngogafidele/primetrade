@@ -709,12 +709,12 @@ export function SalesManager({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Outstanding Details</DialogTitle>
+            <DialogTitle>Loan Details</DialogTitle>
           </DialogHeader>
 
           <div className="rounded-lg border border-border/80 bg-muted/40 p-3 text-sm">
             <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-              Unpaid Sale
+              Loan Sale
             </p>
             <p className="mt-1 text-muted-foreground">
               Add customer details and the expected payment date before

@@ -616,7 +616,7 @@ export default async function ReportsPage({
     { label: "Sales Records", value: formatNumber(totals.sales) },
     { label: "Products", value: formatNumber(totals.products) },
     {
-      label: "Outstanding Sales",
+      label: "Loan Sales",
       value: formatCurrency(totals.outstandingSales),
     },
   ]
@@ -725,8 +725,8 @@ export default async function ReportsPage({
               <TableHead>Bank</TableHead>
               <TableHead>Sales</TableHead>
               <TableHead>Products</TableHead>
-              <TableHead>Outstanding Sales</TableHead>
-              <TableHead>Outstanding Invoices</TableHead>
+              <TableHead>Loan Sales</TableHead>
+              <TableHead>Loan Invoices</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

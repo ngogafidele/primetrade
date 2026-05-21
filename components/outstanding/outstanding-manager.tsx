@@ -109,13 +109,13 @@ export function OutstandingManager({
       const body = await response.json().catch(() => null)
 
       if (!response.ok || !body?.success) {
-        setError(body?.error ?? "Failed to remove outstanding record.")
+        setError(body?.error ?? "Failed to remove loan record.")
         return
       }
 
       setSales((current) => current.filter((sale) => sale._id !== saleId))
     } catch {
-      setError("Failed to remove outstanding record.")
+      setError("Failed to remove loan record.")
     } finally {
       setUpdatingId(null)
     }
@@ -131,11 +131,11 @@ export function OutstandingManager({
       if (sale.customerPhone !== "Not recorded") {
         params.set("customerPhone", sale.customerPhone)
       }
-      const response = await fetch(`/api/outstanding/pdf?${params.toString()}`)
+      const response = await fetch(`/api/loans/pdf?${params.toString()}`)
 
       if (!response.ok) {
         const body = await response.json().catch(() => null)
-        setError(body?.error ?? "Failed to download outstanding PDF.")
+        setError(body?.error ?? "Failed to download loan PDF.")
         return
       }
 
@@ -143,7 +143,7 @@ export function OutstandingManager({
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      link.download = `outstanding-${sale.customerName
+      link.download = `loan-${sale.customerName
         .replace(/[^a-z0-9]+/gi, "-")
         .replace(/^-+|-+$/g, "")
         .toLowerCase() || "customer"}.pdf`
@@ -152,7 +152,7 @@ export function OutstandingManager({
       link.remove()
       URL.revokeObjectURL(url)
     } catch {
-      setError("Failed to download outstanding PDF.")
+      setError("Failed to download loan PDF.")
     } finally {
       setDownloadingKey(null)
     }
@@ -162,7 +162,7 @@ export function OutstandingManager({
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Matching Outstanding Sales</p>
+          <p className="text-sm text-muted-foreground">Matching Loans</p>
           <p className="mt-1 text-2xl font-semibold">{filteredSales.length}</p>
         </div>
         <div className="rounded-2xl border border-border bg-card p-4">
@@ -232,7 +232,7 @@ export function OutstandingManager({
             {filteredSales.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-muted-foreground">
-                  No outstanding sales match this search.
+                  No loans match this search.
                 </TableCell>
               </TableRow>
             ) : (

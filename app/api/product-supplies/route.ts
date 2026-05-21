@@ -7,6 +7,10 @@ import { requireAdmin } from "@/lib/auth/middleware"
 import { CreateProductSupplySchema } from "@/lib/db/validators/product-supply"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 import { parseKigaliDateInput } from "@/lib/utils/time"
+import {
+  serializeProduct,
+  serializeProductSupply,
+} from "@/lib/products/serialization"
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,8 +30,12 @@ export async function GET(request: NextRequest) {
     const supplies = await ProductSupply.find(query)
       .sort({ suppliedAt: -1, createdAt: -1 })
       .limit(100)
+      .lean()
 
-    return NextResponse.json({ success: true, data: supplies })
+    return NextResponse.json({
+      success: true,
+      data: supplies.map(serializeProductSupply),
+    })
   } catch {
     return NextResponse.json(
       { success: false, error: "Failed to fetch product supplies" },
@@ -96,7 +104,17 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(
-      { success: true, data: { supply, product: updatedProduct } },
+      {
+        success: true,
+        data: {
+          supply: serializeProductSupply(supply),
+          product: serializeProduct({
+            ...updatedProduct.toObject(),
+            supplierName: supply.supplierName,
+            lastRestockAt: supply.suppliedAt,
+          }),
+        },
+      },
       { status: 201 }
     )
   } catch (error) {

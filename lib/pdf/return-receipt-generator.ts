@@ -71,6 +71,7 @@ type ReceiptPdfDocument = {
   strokeColor(color: string): ReceiptPdfDocument
   stroke(): ReceiptPdfDocument
   addPage(): ReceiptPdfDocument
+  heightOfString(text: string, options?: { width?: number }): number
 }
 
 const logoPath = path.join(process.cwd(), "public", "images", "logo.png")
@@ -91,11 +92,15 @@ const businessFooterLines = [
   "Momo Pay Name: Prime Trade Company",
 ]
 
+const thankYouMessage = "Thank You For Doing Business With Us!"
+const thankYouFooterOffset = 64
+
 const printColor = {
   text: "#000000",
   muted: "#000000",
   accent: "#000000",
-  headerBackground: "#d1d5db",
+  headerBackground: "#1d4ed8",
+  headerText: "#ffffff",
   rowBackground: "#eeeeee",
   rule: "#000000",
 }
@@ -173,7 +178,7 @@ function renderItemsTable(
     .rect(48, y, 499, 22)
     .fillColor(printColor.headerBackground)
     .fill()
-    .fillColor(printColor.text)
+    .fillColor(printColor.headerText)
     .font("Helvetica-Bold")
     .fontSize(9)
     .text("Item", 54, y + 7)
@@ -241,7 +246,7 @@ export async function generateReturnReceiptPDF(
     .fillColor(printColor.text)
     .font("Helvetica-Bold")
     .fontSize(22)
-    .text("Return Receipt", 340, 58, { align: "right" })
+    .text("Return Statement", 340, 58, { align: "right" })
     .font("Helvetica")
     .fontSize(10)
     .fillColor(printColor.muted)
@@ -287,29 +292,32 @@ export async function generateReturnReceiptPDF(
     .strokeColor(printColor.rule)
     .stroke()
 
+  const noteText = receipt.notes?.trim()
+  let footerY = y + 58
+
+  if (noteText) {
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .fillColor(printColor.text)
+      .text("Note", 48, y + 20)
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor(printColor.muted)
+      .text(noteText, 48, y + 38, { width: 260 })
+
+    const noteHeight = doc.heightOfString(noteText, { width: 260 })
+    footerY = Math.max(footerY, y + 66 + noteHeight)
+  }
+
   doc
-    .fontSize(11)
     .font("Helvetica-Bold")
+    .fontSize(14)
     .fillColor(printColor.text)
-    .text("Revenue Reversed", 330, y + 16)
-    .text(formatCurrency(receipt.totalReturnAmount), 448, y + 16, {
+    .text("Revenue Reversed", 330, y + 20)
+    .text(formatCurrency(receipt.totalReturnAmount), 448, y + 20, {
       width: 92,
     })
-
-  let footerY = y + 52
-
-  if (receipt.notes) {
-    doc
-      .fontSize(10)
-      .font("Helvetica-Bold")
-      .fillColor(printColor.text)
-      .text("Notes", 48, footerY)
-      .fontSize(9)
-      .font("Helvetica")
-      .fillColor(printColor.muted)
-      .text(receipt.notes, 48, footerY + 12, { width: 300 })
-    footerY += 46
-  }
 
   if (footerY > 700) {
     doc.addPage()
@@ -321,6 +329,18 @@ export async function generateReturnReceiptPDF(
     .fontSize(9)
     .fillColor(printColor.text)
     .text(businessFooterLines.join("\n"), 48, footerY, { width: 220 })
+
+  doc
+    .rect(48, footerY + thankYouFooterOffset - 6, 499, 22)
+    .fillColor(printColor.headerBackground)
+    .fill()
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .fillColor(printColor.headerText)
+    .text(thankYouMessage, 48, footerY + thankYouFooterOffset, {
+      align: "center",
+      width: 499,
+    })
 
   doc.end()
 

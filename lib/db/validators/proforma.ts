@@ -30,6 +30,7 @@ export const CreateProformaSchema = z
     customerName: z.string().min(1),
     customerEmail: optionalEmailSchema,
     customerPhone: optionalTextSchema,
+    notes: optionalTextSchema,
     items: z.array(ProformaItemSchema).min(1).optional(),
     expiresAt: z.string().datetime().optional(),
   })
@@ -43,6 +44,7 @@ export const UpdateProformaSchema = z
     customerName: z.string().min(1),
     customerEmail: optionalEmailSchema,
     customerPhone: optionalTextSchema,
+    notes: optionalTextSchema,
     items: z.array(ProformaItemSchema).min(1),
     expiresAt: z.string().datetime().optional(),
   })

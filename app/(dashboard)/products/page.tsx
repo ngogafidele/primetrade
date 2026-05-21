@@ -3,6 +3,10 @@ import { Product } from "@/lib/db/models/Product"
 import { ProductSupply } from "@/lib/db/models/ProductSupply"
 import { requireServerSession } from "@/lib/auth/server"
 import { ProductsManager } from "@/components/products/products-manager"
+import {
+  serializeProduct,
+  serializeProductSupply,
+} from "@/lib/products/serialization"
 
 type ProductsPageProduct = {
   _id: { toString(): string }
@@ -26,44 +30,55 @@ type ProductsPageSupply = {
   quantity: number
   unitCost: number
   suppliedAt?: Date
+  recordedBy?: { toString(): string }
   notes?: string
   createdAt?: Date
   updatedAt?: Date
+}
+
+type LatestProductSupply = {
+  _id: { toString(): string }
+  supplierName: string
+  suppliedAt?: Date
 }
 
 export default async function ProductsPage() {
   const session = await requireServerSession()
 
   await connectToDatabase()
-  const products = await Product.find()
-    .sort({ name: 1 })
-    .lean<ProductsPageProduct[]>()
-  const supplies = session.isAdmin
-    ? await ProductSupply.find()
-        .sort({ suppliedAt: -1, createdAt: -1 })
-        .limit(100)
-        .lean<ProductsPageSupply[]>()
-    : []
+  const [products, supplies, latestSupplies] = await Promise.all([
+    Product.find().sort({ name: 1 }).lean<ProductsPageProduct[]>(),
+    session.isAdmin
+      ? ProductSupply.find()
+          .sort({ suppliedAt: -1, createdAt: -1 })
+          .limit(100)
+          .lean<ProductsPageSupply[]>()
+      : Promise.resolve([]),
+    ProductSupply.aggregate<LatestProductSupply>([
+      { $sort: { suppliedAt: -1, createdAt: -1 } },
+      {
+        $group: {
+          _id: "$productId",
+          supplierName: { $first: "$supplierName" },
+          suppliedAt: { $first: "$suppliedAt" },
+        },
+      },
+    ]),
+  ])
+
+  const latestSupplyByProductId = new Map(
+    latestSupplies.map((supply) => [supply._id.toString(), supply])
+  )
 
   const serializedProducts = products.map((product) => {
-    return {
+    const latestSupply = latestSupplyByProductId.get(product._id.toString())
+    return serializeProduct({
       ...product,
-      _id: product._id.toString(),
-      unit: product.unit ?? "pcs",
-      lowStockThreshold: product.lowStockThreshold ?? 0,
-      createdAt: product.createdAt?.toISOString(),
-      updatedAt: product.updatedAt?.toISOString(),
-    }
+      supplierName: latestSupply?.supplierName,
+      lastRestockAt: latestSupply?.suppliedAt,
+    })
   })
-
-  const serializedSupplies = supplies.map((supply) => ({
-    ...supply,
-    _id: supply._id.toString(),
-    productId: supply.productId.toString(),
-    suppliedAt: supply.suppliedAt?.toISOString(),
-    createdAt: supply.createdAt?.toISOString(),
-    updatedAt: supply.updatedAt?.toISOString(),
-  }))
+  const serializedSupplies = supplies.map(serializeProductSupply)
 
   return (
     <ProductsManager
