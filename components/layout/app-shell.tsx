@@ -3,15 +3,21 @@ import Image from "next/image"
 import type { AuthSession } from "@/lib/auth/session"
 import { Sidebar } from "@/components/layout/sidebar"
 import { LogoutButton } from "@/components/auth/logout-button"
+import {
+  HeaderNotificationsButton,
+  type HeaderNotifications,
+} from "@/components/layout/header-notifications"
 import { UserRound } from "lucide-react"
 
 export function AppShell({
   session,
   userName,
+  notifications,
   children,
 }: {
   session: AuthSession
   userName?: string
+  notifications?: HeaderNotifications
   children: ReactNode
 }) {
   const displayName = userName ?? session.name ?? session.email
@@ -19,7 +25,7 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b border-border/80 bg-card/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:px-6 sm:py-4 lg:px-10 md:flex-row md:items-center md:justify-between">
+        <div className="mx-auto flex max-w-[96rem] flex-col gap-3 px-3 py-2.5 sm:px-4 sm:py-3 lg:px-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border bg-white p-1.5 shadow-sm">
               <Image
@@ -38,6 +44,9 @@ export function AppShell({
             </div>
           </div>
           <div className="flex w-full flex-wrap items-center gap-3 md:w-auto md:justify-end">
+            {session.isAdmin && notifications ? (
+              <HeaderNotificationsButton notifications={notifications} />
+            ) : null}
             <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-background px-3 py-2 shadow-sm">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <UserRound className="size-4" />
@@ -55,9 +64,9 @@ export function AppShell({
           </div>
         </div>
       </header>
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-4 sm:px-6 sm:py-6 lg:px-10 md:flex-row">
+      <div className="mx-auto flex max-w-[96rem] flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4 lg:px-5 md:flex-row">
         <Sidebar session={session} />
-        <main className="flex-1 rounded-2xl border border-border/80 bg-card/95 p-4 shadow-sm backdrop-blur-sm sm:p-5 lg:p-6">
+        <main className="flex-1 rounded-2xl border border-border/80 bg-card/95 p-3 shadow-sm backdrop-blur-sm sm:p-4 lg:p-4">
           {children}
         </main>
       </div>

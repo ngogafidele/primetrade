@@ -1,6 +1,7 @@
 import { connectToDatabase } from "@/lib/db/connection"
 import { Sale } from "@/lib/db/models/Sale"
 import { requireServerSession } from "@/lib/auth/server"
+import { approvedSaleFilter } from "@/lib/db/sales-approval"
 import { InvoicesPageClient } from "@/components/invoices/invoices-page-client"
 import { formatInKigali } from "@/lib/utils/time"
 
@@ -14,7 +15,7 @@ export default async function InvoicesPage() {
   const session = await requireServerSession()
 
   await connectToDatabase()
-  const sales = await Sale.find()
+  const sales = await Sale.find(approvedSaleFilter)
     .select("totalAmount createdAt")
     .sort({ createdAt: -1 })
     .lean<InvoicePageSale[]>()

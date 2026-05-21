@@ -29,9 +29,14 @@ type SalesPageSale = {
   updatedAt?: Date
   createdBy?: PopulatedSaleUser | { toString(): string }
   totalAmount: number
+  approvalStatus?: "pending" | "approved"
   paymentStatus: "paid" | "unpaid"
   paymentMethod?: "cash" | "mobile-money" | "bank"
   notes: string
+  customer?: {
+    customerName?: string
+    customerPhone?: string
+  }
   outstanding?: {
     customerName: string
     customerPhone: string
@@ -74,6 +79,7 @@ export default async function SalesPage() {
   const serializedSales = sales.map((sale) => ({
     ...sale,
     _id: sale._id.toString(),
+    approvalStatus: sale.approvalStatus ?? "approved",
     createdAt: sale.createdAt?.toISOString(),
     createdAtLabel: sale.createdAt
       ? formatInKigali(sale.createdAt, {
@@ -87,6 +93,12 @@ export default async function SalesPage() {
         })
       : "-",
     updatedAt: sale.updatedAt?.toISOString(),
+    customer: sale.customer
+      ? {
+          customerName: sale.customer.customerName ?? "",
+          customerPhone: sale.customer.customerPhone ?? "",
+        }
+      : undefined,
     outstanding: sale.outstanding
       ? {
           ...sale.outstanding,
@@ -121,6 +133,7 @@ export default async function SalesPage() {
       initialSales={serializedSales}
       products={serializedProducts}
       currentUserLabel={session.email}
+      canApproveSales={session.isAdmin}
     />
   )
 }

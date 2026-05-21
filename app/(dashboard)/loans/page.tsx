@@ -2,6 +2,7 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { Sale } from "@/lib/db/models/Sale"
 import "@/lib/db/models/User"
 import { requireServerSession } from "@/lib/auth/server"
+import { approvedSaleFilter } from "@/lib/db/sales-approval"
 import { formatInKigali, getKigaliDateParts } from "@/lib/utils/time"
 import { OutstandingManager } from "@/components/outstanding/outstanding-manager"
 
@@ -60,7 +61,10 @@ export default async function LoansPage() {
   await requireServerSession()
   await connectToDatabase()
 
-  const loanSales = await Sale.find({ paymentStatus: "unpaid" })
+  const loanSales = await Sale.find({
+    ...approvedSaleFilter,
+    paymentStatus: "unpaid",
+  })
     .populate("createdBy", "name email")
     .sort({ "outstanding.paymentDate": 1, createdAt: -1 })
     .lean<LoanSale[]>()

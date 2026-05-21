@@ -6,6 +6,10 @@ import { ReturnTransaction } from "@/lib/db/models/Return"
 import { Sale } from "@/lib/db/models/Sale"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Expense } from "@/lib/db/models/Expense"
+import {
+  approvedSaleDateFilter,
+  approvedSaleFilter,
+} from "@/lib/db/sales-approval"
 import { getKigaliDateParts } from "@/lib/utils/time"
 
 type DashboardSaleItem = {
@@ -16,6 +20,7 @@ type DashboardSaleItem = {
 type DashboardRecentSale = {
   _id: { toString(): string }
   createdAt?: Date
+  approvedAt?: Date
   totalAmount: number
   items: DashboardSaleItem[]
 }
@@ -74,9 +79,8 @@ export async function GET(request: NextRequest) {
     await connectToDatabase()
 
     const today = getTodayRange()
-    const todayFilter = {
-      createdAt: { $gte: today.start, $lt: today.end },
-    }
+    const todayDateRange = { $gte: today.start, $lt: today.end }
+    const todayFilter = approvedSaleDateFilter(todayDateRange)
 
     const [
       productCount,
@@ -90,14 +94,14 @@ export async function GET(request: NextRequest) {
       Product.countDocuments({
         $expr: { $lte: ["$quantity", { $ifNull: ["$lowStockThreshold", 0] }] },
       }),
-      Sale.countDocuments(),
+      Sale.countDocuments(approvedSaleFilter),
       Sale.countDocuments(todayFilter),
       Invoice.countDocuments(),
       Invoice.countDocuments({ status: "unpaid" }),
     ])
 
     const sales = await Sale.aggregate<DashboardMoneyTotal>([
-      { $match: {} },
+      { $match: approvedSaleFilter },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ])
 
@@ -221,8 +225,8 @@ export async function GET(request: NextRequest) {
         $match: {
           $or: [
             { incurredAt: { $gte: today.start, $lt: today.end } },
-            { incurredAt: { $exists: false }, createdAt: todayFilter.createdAt },
-            { incurredAt: null, createdAt: todayFilter.createdAt },
+            { incurredAt: { $exists: false }, createdAt: todayDateRange },
+            { incurredAt: null, createdAt: todayDateRange },
           ],
         },
       },
@@ -237,14 +241,14 @@ export async function GET(request: NextRequest) {
       .limit(8)
       .lean<DashboardLowStockProduct[]>()
 
-    const recentSales = await Sale.find()
-      .select("totalAmount items createdAt")
+    const recentSales = await Sale.find(approvedSaleFilter)
+      .select("totalAmount items createdAt approvedAt")
       .sort({ createdAt: -1 })
       .limit(6)
       .lean<DashboardRecentSale[]>()
 
     const topMoving = await Sale.aggregate<DashboardTopMovingProduct>([
-      { $match: {} },
+      { $match: approvedSaleFilter },
       { $unwind: "$items" },
       {
         $group: {
@@ -336,7 +340,7 @@ export async function GET(request: NextRequest) {
         })),
         recentSales: recentSales.map((sale) => ({
           _id: sale._id.toString(),
-          createdAt: sale.createdAt,
+          createdAt: sale.approvedAt ?? sale.createdAt,
           totalAmount: sale.totalAmount,
           quantitySold: sale.items.reduce((acc, item) => acc + item.quantity, 0),
           units: Array.from(

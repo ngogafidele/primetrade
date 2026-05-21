@@ -61,6 +61,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if ((sale.approvalStatus ?? "approved") !== "approved") {
+      return NextResponse.json(
+        { success: false, error: "Approve this sale before creating an invoice" },
+        { status: 400 }
+      )
+    }
+
     const existingInvoice = await Invoice.findOne({ saleId: sale._id })
     if (existingInvoice) {
       return NextResponse.json(

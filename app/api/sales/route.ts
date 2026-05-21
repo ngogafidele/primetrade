@@ -5,6 +5,7 @@ import { Sale } from "@/lib/db/models/Sale"
 import { requireAuth } from "@/lib/auth/middleware"
 import { CreateSaleSchema } from "@/lib/db/validators/sale"
 import { syncLowStockAlert } from "@/lib/db/alerts"
+import { approvedSaleFilter } from "@/lib/db/sales-approval"
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
 
     await connectToDatabase()
-    const sales = await Sale.find().sort({ createdAt: -1 })
+    const sales = await Sale.find(approvedSaleFilter).sort({ createdAt: -1 })
 
     return NextResponse.json({ success: true, data: sales })
   } catch (error) {
@@ -42,7 +43,9 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase()
 
-    const productIds = payload.items.map((item) => item.productId)
+    const productIds = Array.from(
+      new Set(payload.items.map((item) => item.productId))
+    )
     const products = await Product.find({ _id: { $in: productIds } })
 
     if (products.length !== productIds.length) {
@@ -94,41 +97,52 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    const shouldApproveImmediately = session.isAdmin
+    const approvalStatus = shouldApproveImmediately ? "approved" : "pending"
+    const approvedAt = shouldApproveImmediately ? new Date() : undefined
     const decrementedProducts: Array<{
       productId: string
       quantity: number
     }> = []
 
-    for (const [productId, quantity] of requestedQuantities.entries()) {
-      const result = await Product.updateOne(
-        { _id: productId, quantity: { $gte: quantity } },
-        { $inc: { quantity: -quantity } }
-      )
+    if (shouldApproveImmediately) {
+      for (const [productId, quantity] of requestedQuantities.entries()) {
+        const result = await Product.updateOne(
+          { _id: productId, quantity: { $gte: quantity } },
+          { $inc: { quantity: -quantity } }
+        )
 
-      if (result.modifiedCount !== 1) {
-        if (decrementedProducts.length > 0) {
-          await Product.bulkWrite(
-            decrementedProducts.map((entry) => ({
-              updateOne: {
-                filter: { _id: entry.productId },
-                update: { $inc: { quantity: entry.quantity } },
-              },
-            }))
+        if (result.modifiedCount !== 1) {
+          if (decrementedProducts.length > 0) {
+            await Product.bulkWrite(
+              decrementedProducts.map((entry) => ({
+                updateOne: {
+                  filter: { _id: entry.productId },
+                  update: { $inc: { quantity: entry.quantity } },
+                },
+              }))
+            )
+          }
+
+          const product = productMap.get(productId)
+          throw new Error(
+            product
+              ? `Insufficient stock for ${product.name}`
+              : "One or more products not found"
           )
         }
 
-        const product = productMap.get(productId)
-        throw new Error(
-          product
-            ? `Insufficient stock for ${product.name}`
-            : "One or more products not found"
-        )
+        decrementedProducts.push({ productId, quantity })
       }
-
-      decrementedProducts.push({ productId, quantity })
     }
 
     let sale
+    let customer:
+      | {
+          customerName: string
+          customerPhone: string
+        }
+      | undefined
     try {
       const outstanding =
         payload.paymentStatus === "unpaid" && payload.outstanding
@@ -146,17 +160,46 @@ export async function POST(request: NextRequest) {
         throw new Error("Payment date is invalid")
       }
 
+      customer =
+        payload.paymentStatus === "paid" &&
+        (payload.customer?.customerName?.trim() ||
+          payload.customer?.customerPhone?.trim())
+          ? {
+              customerName: payload.customer.customerName?.trim() ?? "",
+              customerPhone: payload.customer.customerPhone?.trim() ?? "",
+            }
+          : undefined
+
       sale = await Sale.create({
         items: saleItems,
         totalAmount,
         paymentStatus: payload.paymentStatus,
         paymentMethod:
           payload.paymentStatus === "paid" ? payload.paymentMethod : undefined,
+        approvalStatus,
+        approvedBy: shouldApproveImmediately ? session.userId : undefined,
+        approvedAt,
         createdBy: session.userId,
         notes: payload.notes ?? "",
+        customer,
         outstanding,
       })
+      await Sale.collection.updateOne(
+        { _id: sale._id },
+        {
+          $set: {
+            approvalStatus,
+            ...(customer ? { customer } : {}),
+            ...(shouldApproveImmediately
+              ? { approvedBy: session.userId, approvedAt }
+              : {}),
+          },
+        }
+      )
     } catch (error) {
+      if (sale?._id) {
+        await Sale.collection.deleteOne({ _id: sale._id })
+      }
       if (decrementedProducts.length > 0) {
         await Product.bulkWrite(
           decrementedProducts.map((entry) => ({
@@ -171,27 +214,44 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await Promise.all(
-        Array.from(requestedQuantities.entries()).map(
-          async ([productId, quantity]) => {
-            const product = productMap.get(productId)
-            if (!product) return
-            const newQuantity = product.quantity - quantity
-            await syncLowStockAlert({
-              productId: product._id.toString(),
-              name: product.name,
-              sku: product.sku,
-              quantity: newQuantity,
-              threshold: product.lowStockThreshold ?? 0,
-            })
-          }
+      if (shouldApproveImmediately) {
+        await Promise.all(
+          Array.from(requestedQuantities.entries()).map(
+            async ([productId, quantity]) => {
+              const product = productMap.get(productId)
+              if (!product) return
+              const newQuantity = product.quantity - quantity
+              await syncLowStockAlert({
+                productId: product._id.toString(),
+                name: product.name,
+                sku: product.sku,
+                quantity: newQuantity,
+                threshold: product.lowStockThreshold ?? 0,
+              })
+            }
+          )
         )
-      )
+      }
     } catch (error) {
       console.error("[Low Stock Alert Sync Error]", error)
     }
 
-    return NextResponse.json({ success: true, data: sale }, { status: 201 })
+    const saleData =
+      typeof sale.toObject === "function" ? sale.toObject() : sale
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          ...saleData,
+          approvalStatus,
+          customer,
+          approvedBy: shouldApproveImmediately ? session.userId : undefined,
+          approvedAt,
+        },
+      },
+      { status: 201 }
+    )
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to create sale"

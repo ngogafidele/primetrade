@@ -98,7 +98,7 @@ const printColor = {
   accent: "#000000",
   headerBackground: "#1d4ed8",
   headerText: "#ffffff",
-  rowBackground: "#eeeeee",
+  rowBackground: "#DCE1F0",
   rule: "#000000",
 }
 

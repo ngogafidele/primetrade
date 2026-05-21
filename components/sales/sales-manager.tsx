@@ -52,9 +52,14 @@ type SaleClient = {
   _id: string
   items: SaleItemClient[]
   totalAmount: number
+  approvalStatus?: "pending" | "approved"
   paymentStatus: "paid" | "unpaid"
   paymentMethod?: "cash" | "mobile-money" | "bank"
   notes: string
+  customer?: {
+    customerName?: string
+    customerPhone?: string
+  }
   outstanding?: OutstandingDetails
   createdByName?: string
   createdAtLabel?: string
@@ -98,14 +103,18 @@ export function SalesManager({
   initialSales,
   products,
   currentUserLabel,
+  canApproveSales,
 }: {
   initialSales: SaleClient[]
   products: ProductOption[]
   currentUserLabel: string
+  canApproveSales: boolean
 }) {
   const [sales, setSales] = useState(initialSales)
   const [draftItems, setDraftItems] = useState<DraftItem[]>([emptyDraft])
   const [notes, setNotes] = useState("")
+  const [customerName, setCustomerName] = useState("")
+  const [customerPhone, setCustomerPhone] = useState("")
   const [paymentStatus, setPaymentStatus] = useState<InvoiceStatus>("paid")
   const [paymentMethod, setPaymentMethod] = useState<
     "cash" | "mobile-money" | "bank"
@@ -113,15 +122,33 @@ export function SalesManager({
   const [error, setError] = useState<string | null>(null)
   const [invoiceError, setInvoiceError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [approvingId, setApprovingId] = useState<string | null>(null)
   const [invoiceSubmitting, setInvoiceSubmitting] = useState(false)
+  const [editSubmitting, setEditSubmitting] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [outstandingDialogOpen, setOutstandingDialogOpen] = useState(false)
   const [activeInvoiceSale, setActiveInvoiceSale] = useState<SaleClient | null>(null)
+  const [activeEditSale, setActiveEditSale] = useState<SaleClient | null>(null)
   const [invoiceForm, setInvoiceForm] = useState(defaultInvoiceForm)
+  const [editDraftItems, setEditDraftItems] = useState<DraftItem[]>([emptyDraft])
+  const [editPaymentStatus, setEditPaymentStatus] =
+    useState<InvoiceStatus>("paid")
+  const [editPaymentMethod, setEditPaymentMethod] = useState<
+    "cash" | "mobile-money" | "bank"
+  >("cash")
+  const [editNotes, setEditNotes] = useState("")
+  const [editCustomerName, setEditCustomerName] = useState("")
+  const [editCustomerPhone, setEditCustomerPhone] = useState("")
   const [outstandingForm, setOutstandingForm] = useState(defaultOutstandingForm)
+  const [editOutstandingForm, setEditOutstandingForm] = useState(
+    defaultOutstandingForm
+  )
   const [outstandingError, setOutstandingError] = useState<string | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
   const [invoicedSaleIds, setInvoicedSaleIds] = useState<string[]>([])
+  const [saleSearch, setSaleSearch] = useState("")
 
   const draftTotal = useMemo(() => {
     return draftItems.reduce((sum, item) => {
@@ -132,23 +159,59 @@ export function SalesManager({
     }, 0)
   }, [draftItems])
 
+  const editTotal = useMemo(() => {
+    return editDraftItems.reduce((sum, item) => {
+      const quantity = Number(item.quantity)
+      const price = Number(item.sellingPrice)
+      if (Number.isNaN(quantity) || Number.isNaN(price)) return sum
+      return sum + quantity * price
+    }, 0)
+  }, [editDraftItems])
+
   const productMap = useMemo(
     () => new Map(products.map((product) => [product._id, product])),
     [products]
   )
 
-  const pageCount = Math.max(1, Math.ceil(sales.length / SALES_PER_PAGE))
+  const filteredSales = useMemo(() => {
+    const search = saleSearch.trim().toLowerCase()
+    if (!search) return sales
+
+    return sales.filter((sale) => {
+      const customerName =
+        sale.paymentStatus === "unpaid"
+          ? sale.outstanding?.customerName
+          : sale.customer?.customerName
+      const customerPhone =
+        sale.paymentStatus === "unpaid"
+          ? sale.outstanding?.customerPhone
+          : sale.customer?.customerPhone
+
+      return `${customerName ?? ""} ${customerPhone ?? ""}`
+        .toLowerCase()
+        .includes(search)
+    })
+  }, [saleSearch, sales])
+
+  const pageCount = Math.max(1, Math.ceil(filteredSales.length / SALES_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, pageCount)
   const pageStart = (safeCurrentPage - 1) * SALES_PER_PAGE
-  const paginatedSales = sales.slice(pageStart, pageStart + SALES_PER_PAGE)
-  const visibleStart = sales.length === 0 ? 0 : pageStart + 1
-  const visibleEnd = Math.min(pageStart + SALES_PER_PAGE, sales.length)
+  const paginatedSales = filteredSales.slice(
+    pageStart,
+    pageStart + SALES_PER_PAGE
+  )
+  const visibleStart = filteredSales.length === 0 ? 0 : pageStart + 1
+  const visibleEnd = Math.min(pageStart + SALES_PER_PAGE, filteredSales.length)
 
   useEffect(() => {
     if (currentPage > pageCount) {
       setCurrentPage(pageCount)
     }
   }, [currentPage, pageCount])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [saleSearch])
 
   useEffect(() => {
     async function loadInvoices() {
@@ -189,9 +252,35 @@ export function SalesManager({
     )
   }
 
+  const setEditDraftItem = (
+    index: number,
+    key: keyof DraftItem,
+    value: string
+  ) => {
+    setEditDraftItems((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [key]: value } : item
+      )
+    )
+  }
+
+  const addEditDraftItem = () => {
+    setEditDraftItems((current) => [...current, emptyDraft])
+  }
+
+  const removeEditDraftItem = (index: number) => {
+    setEditDraftItems((current) =>
+      current.length === 1
+        ? current
+        : current.filter((_, itemIndex) => itemIndex !== index)
+    )
+  }
+
   const resetForm = () => {
     setDraftItems([emptyDraft])
     setNotes("")
+    setCustomerName("")
+    setCustomerPhone("")
     setPaymentStatus("paid")
     setPaymentMethod("cash")
     setError(null)
@@ -200,28 +289,90 @@ export function SalesManager({
   }
 
   const openInvoiceDialog = (sale: SaleClient) => {
+    if ((sale.approvalStatus ?? "approved") === "pending") {
+      setError("Approve this sale before creating an invoice.")
+      return
+    }
+
     setInvoiceError(null)
     setActiveInvoiceSale(sale)
     setInvoiceForm({
       ...defaultInvoiceForm,
+      customerName:
+        sale.paymentStatus === "unpaid"
+          ? sale.outstanding?.customerName ?? ""
+          : sale.customer?.customerName ?? "",
+      customerPhone:
+        sale.paymentStatus === "unpaid"
+          ? sale.outstanding?.customerPhone ?? ""
+          : sale.customer?.customerPhone ?? "",
       status: sale.paymentStatus,
     })
     setInvoiceDialogOpen(true)
+  }
+
+  const toDateInputValue = (value?: string) => {
+    if (!value) return ""
+    return value.slice(0, 10)
+  }
+
+  const openEditDialog = (sale: SaleClient) => {
+    setEditError(null)
+    setActiveEditSale(sale)
+    setEditDraftItems(
+      sale.items.length
+        ? sale.items.map((item) => ({
+            productId: item.productId,
+            quantity: String(item.quantity),
+            sellingPrice: String(item.sellingPrice),
+          }))
+        : [emptyDraft]
+    )
+    setEditPaymentStatus(sale.paymentStatus)
+    setEditPaymentMethod(sale.paymentMethod ?? "cash")
+    setEditNotes(sale.notes ?? "")
+    setEditCustomerName(
+      sale.customer?.customerName ?? sale.outstanding?.customerName ?? ""
+    )
+    setEditCustomerPhone(
+      sale.customer?.customerPhone ?? sale.outstanding?.customerPhone ?? ""
+    )
+    setEditOutstandingForm({
+      customerName:
+        sale.outstanding?.customerName ?? sale.customer?.customerName ?? "",
+      customerPhone:
+        sale.outstanding?.customerPhone ?? sale.customer?.customerPhone ?? "",
+      paymentDate: toDateInputValue(sale.outstanding?.paymentDate),
+    })
+    setEditDialogOpen(true)
   }
 
   const getItemLabel = (item: SaleItemClient) => {
     return item.name?.trim() || item.sku?.trim() || "Unnamed item"
   }
 
-  const validateSaleItems = () => {
-    const payloadItems = draftItems.map((item) => ({
+  const getSaleQuantityMap = (sale: SaleClient | null) => {
+    const quantities = new Map<string, number>()
+    sale?.items.forEach((item) => {
+      const current = quantities.get(item.productId) ?? 0
+      quantities.set(item.productId, current + item.quantity)
+    })
+    return quantities
+  }
+
+  const validateDraftItems = (
+    items: DraftItem[],
+    setMessage: (message: string) => void,
+    existingSale: SaleClient | null = null
+  ) => {
+    const payloadItems = items.map((item) => ({
       productId: item.productId,
       quantity: Number(item.quantity),
       sellingPrice: Number(item.sellingPrice),
     }))
 
     if (payloadItems.some((item) => !item.productId)) {
-      setError("Select a product for each line.")
+      setMessage("Select a product for each line.")
       return null
     }
 
@@ -234,7 +385,7 @@ export function SalesManager({
           item.sellingPrice < 0
       )
     ) {
-      setError("Quantity must be at least 1 and price must be 0 or more.")
+      setMessage("Quantity must be at least 1 and price must be 0 or more.")
       return null
     }
 
@@ -247,16 +398,25 @@ export function SalesManager({
     for (const [productId, totalRequested] of requestedByProduct.entries()) {
       const product = productMap.get(productId)
       if (!product) {
-        setError("One selected product is no longer available.")
+        setMessage("One selected product is no longer available.")
         return null
       }
-      if (totalRequested > product.quantity) {
-        setError(`Insufficient stock for ${product.name}.`)
+      const existingQuantities = getSaleQuantityMap(existingSale)
+      const reusableQuantity =
+        (existingSale?.approvalStatus ?? "approved") === "approved"
+          ? existingQuantities.get(productId) ?? 0
+          : 0
+      if (totalRequested > product.quantity + reusableQuantity) {
+        setMessage(`Insufficient stock for ${product.name}.`)
         return null
       }
     }
 
     return payloadItems
+  }
+
+  const validateSaleItems = () => {
+    return validateDraftItems(draftItems, setError)
   }
 
   const recordSale = async (outstanding?: OutstandingDetails) => {
@@ -276,6 +436,14 @@ export function SalesManager({
           items: payloadItems,
           paymentStatus,
           ...(paymentStatus === "paid" ? { paymentMethod } : {}),
+          customer:
+            paymentStatus === "paid" &&
+            (customerName.trim() || customerPhone.trim())
+              ? {
+                  customerName: customerName.trim(),
+                  customerPhone: customerPhone.trim(),
+                }
+              : undefined,
           notes: notes.trim(),
           outstanding:
             paymentStatus === "unpaid" && outstanding
@@ -302,6 +470,9 @@ export function SalesManager({
       setSales((current) => [
         {
           ...createdSale,
+          approvalStatus:
+            createdSale.approvalStatus ??
+            (canApproveSales ? "approved" : "pending"),
           paymentStatus: createdSale.paymentStatus ?? paymentStatus,
           paymentMethod:
             createdSale.paymentMethod ??
@@ -401,14 +572,158 @@ export function SalesManager({
     }
   }
 
+  const submitEditSale = async () => {
+    if (!activeEditSale) return
+
+    setEditError(null)
+    const payloadItems = validateDraftItems(
+      editDraftItems,
+      setEditError,
+      activeEditSale
+    )
+    if (!payloadItems) return
+
+    if (editPaymentStatus === "unpaid") {
+      if (!editOutstandingForm.customerName.trim()) {
+        setEditError("Customer names are required.")
+        return
+      }
+
+      if (!editOutstandingForm.customerPhone.trim()) {
+        setEditError("Phone number is required.")
+        return
+      }
+
+      if (!editOutstandingForm.paymentDate) {
+        setEditError("Payment date is required.")
+        return
+      }
+    }
+
+    setEditSubmitting(true)
+
+    try {
+      const response = await fetch(`/api/sales/${activeEditSale._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: payloadItems,
+          paymentStatus: editPaymentStatus,
+          ...(editPaymentStatus === "paid" ? { paymentMethod: editPaymentMethod } : {}),
+          customer:
+            editPaymentStatus === "paid" &&
+            (editCustomerName.trim() || editCustomerPhone.trim())
+              ? {
+                  customerName: editCustomerName.trim(),
+                  customerPhone: editCustomerPhone.trim(),
+                }
+              : undefined,
+          notes: editNotes.trim(),
+          outstanding:
+            editPaymentStatus === "unpaid"
+              ? {
+                  customerName: editOutstandingForm.customerName.trim(),
+                  customerPhone: editOutstandingForm.customerPhone.trim(),
+                  paymentDate: editOutstandingForm.paymentDate,
+                }
+              : undefined,
+        }),
+      })
+
+      const body = await response.json().catch(() => null)
+      if (!response.ok || !body?.success) {
+        setEditError(body?.error ?? "Failed to edit sale.")
+        return
+      }
+
+      const updatedSale = body.data as SaleClient
+      setSales((current) =>
+        current.map((sale) =>
+          sale._id === activeEditSale._id
+            ? {
+                ...sale,
+                ...updatedSale,
+                _id: sale._id,
+                createdAtLabel: sale.createdAtLabel,
+                createdByName: sale.createdByName,
+                approvalStatus:
+                  updatedSale.approvalStatus ?? sale.approvalStatus,
+              }
+            : sale
+        )
+      )
+      setEditDialogOpen(false)
+      setActiveEditSale(null)
+    } catch {
+      setEditError("Failed to edit sale.")
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
   const paymentStatusLabel = (status: InvoiceStatus) =>
     status === "paid" ? "Paid" : "Unpaid"
+
+  const approvalStatusLabel = (status?: "pending" | "approved") =>
+    status === "pending" ? "Pending" : "Approved"
+
+  const approveSale = async (saleId: string) => {
+    setError(null)
+    setApprovingId(saleId)
+
+    try {
+      const response = await fetch(`/api/sales/${saleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvalStatus: "approved" }),
+      })
+
+      const body = await response.json().catch(() => null)
+      if (!response.ok || !body?.success) {
+        setError(body?.error ?? "Failed to approve sale.")
+        return
+      }
+
+      setSales((current) =>
+        current.map((sale) =>
+          sale._id === saleId
+            ? {
+                ...sale,
+                approvalStatus: "approved",
+              }
+            : sale
+        )
+      )
+    } catch {
+      setError("Failed to approve sale.")
+    } finally {
+      setApprovingId(null)
+    }
+  }
 
   const paymentMethodLabel = (method?: "cash" | "mobile-money" | "bank") => {
     if (!method) return "-"
     if (method === "mobile-money") return "Mobile Money"
     if (method === "bank") return "Bank"
     return "Cash"
+  }
+
+  const customerNameLabel = (sale: SaleClient) => {
+    const name =
+      sale.paymentStatus === "unpaid"
+        ? sale.outstanding?.customerName
+        : sale.customer?.customerName
+
+    return name || "-"
+  }
+
+  const customerPhoneLabel = (sale: SaleClient) => {
+    const phone =
+      sale.paymentStatus === "unpaid"
+        ? sale.outstanding?.customerPhone
+        : sale.customer?.customerPhone
+
+    return phone || "-"
   }
 
   const invoicedSaleIdSet = useMemo(
@@ -426,6 +741,12 @@ export function SalesManager({
         <p className="text-sm text-muted-foreground">
           Logged in as: {currentUserLabel}
         </p>
+        {canApproveSales ? (
+          <p className="text-sm text-muted-foreground">
+            Pending sales enter stock, dashboards, reports, loans, and invoices
+            only after approval.
+          </p>
+        ) : null}
       </div>
 
       <section className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
@@ -547,6 +868,28 @@ export function SalesManager({
           ) : null}
         </div>
 
+        {paymentStatus === "paid" ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="grid gap-1 text-sm">
+              Customer Names (optional)
+              <Input
+                value={customerName}
+                onChange={(event) => setCustomerName(event.target.value)}
+                placeholder="Customer names"
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm">
+              Phone Number (optional)
+              <Input
+                value={customerPhone}
+                onChange={(event) => setCustomerPhone(event.target.value)}
+                placeholder="Phone number"
+              />
+            </label>
+          </div>
+        ) : null}
+
         <label className="grid gap-1 text-sm">
           Notes (optional)
           <textarea
@@ -573,26 +916,41 @@ export function SalesManager({
         </Button>
       </section>
 
+      <div className="grid gap-2 sm:max-w-md">
+        <label className="grid gap-1 text-sm">
+          Search Sales
+          <Input
+            value={saleSearch}
+            onChange={(event) => setSaleSearch(event.target.value)}
+            placeholder="Customer name or phone number"
+          />
+        </label>
+      </div>
+
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Time</TableHead>
             <TableHead>Items Sold</TableHead>
-            <TableHead>Quantity Sold</TableHead>
             <TableHead>Cost Price</TableHead>
             <TableHead>Sold Price</TableHead>
             <TableHead>Total</TableHead>
             <TableHead>Payment</TableHead>
+            <TableHead>Approval</TableHead>
             <TableHead>Method</TableHead>
+            <TableHead>Customer</TableHead>
+            <TableHead>Phone</TableHead>
             <TableHead>Logged By</TableHead>
-            <TableHead className="text-right">Invoice</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {paginatedSales.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-muted-foreground">
-                No sales recorded yet.
+              <TableCell colSpan={12} className="text-muted-foreground">
+                {saleSearch.trim()
+                  ? "No sales match that customer search."
+                  : "No sales recorded yet."}
               </TableCell>
             </TableRow>
           ) : (
@@ -608,6 +966,7 @@ export function SalesManager({
                     },
                   ]
               const rowSpan = items.length
+              const isPending = (sale.approvalStatus ?? "approved") === "pending"
 
               return (
                 <Fragment key={sale._id}>
@@ -620,16 +979,16 @@ export function SalesManager({
                       ) : null}
                       <TableCell>
                         <div className="whitespace-normal wrap-break-word">
-                          <p className="font-medium">{getItemLabel(item)}</p>
+                          <p className="font-medium">
+                            {getItemLabel(item)} ({item.quantity}{" "}
+                            {item.unit ?? "pcs"})
+                          </p>
                           {item.sku ? (
                             <p className="text-xs text-muted-foreground">
                               {item.sku}
                             </p>
                           ) : null}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {item.quantity} {item.unit ?? "pcs"}
                       </TableCell>
                       <TableCell>{formatCurrency(item.basePrice ?? 0)}</TableCell>
                       <TableCell>{formatCurrency(item.sellingPrice)}</TableCell>
@@ -642,22 +1001,71 @@ export function SalesManager({
                             {paymentStatusLabel(sale.paymentStatus)}
                           </TableCell>
                           <TableCell rowSpan={rowSpan}>
+                            <span
+                              className={
+                                isPending
+                                  ? "inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800"
+                                  : "inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800"
+                              }
+                            >
+                              {approvalStatusLabel(sale.approvalStatus)}
+                            </span>
+                          </TableCell>
+                          <TableCell rowSpan={rowSpan}>
                             {paymentMethodLabel(sale.paymentMethod)}
+                          </TableCell>
+                          <TableCell rowSpan={rowSpan}>
+                            <span className="whitespace-normal wrap-break-word">
+                              {customerNameLabel(sale)}
+                            </span>
+                          </TableCell>
+                          <TableCell rowSpan={rowSpan}>
+                            <span className="whitespace-normal wrap-break-word">
+                              {customerPhoneLabel(sale)}
+                            </span>
                           </TableCell>
                           <TableCell rowSpan={rowSpan}>
                             {sale.createdByName ?? "Unknown User"}
                           </TableCell>
                           <TableCell rowSpan={rowSpan} className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openInvoiceDialog(sale)}
-                              disabled={invoicedSaleIdSet.has(sale._id)}
-                            >
-                              {invoicedSaleIdSet.has(sale._id)
-                                ? "Invoiced"
-                                : "Create Invoice"}
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              {canApproveSales && isPending ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => approveSale(sale._id)}
+                                  disabled={approvingId === sale._id}
+                                >
+                                  {approvingId === sale._id
+                                    ? "Approving..."
+                                    : "Approve"}
+                                </Button>
+                              ) : null}
+                              {canApproveSales ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openEditDialog(sale)}
+                                  disabled={invoicedSaleIdSet.has(sale._id)}
+                                >
+                                  Edit
+                                </Button>
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openInvoiceDialog(sale)}
+                                disabled={
+                                  isPending ||
+                                  invoicedSaleIdSet.has(sale._id)
+                                }
+                              >
+                                {isPending
+                                  ? "Pending"
+                                  : invoicedSaleIdSet.has(sale._id)
+                                    ? "Invoiced"
+                                    : "Create Invoice"}
+                              </Button>
+                            </div>
                           </TableCell>
                         </>
                       ) : null}
@@ -671,7 +1079,8 @@ export function SalesManager({
       </Table>
       <div className="flex flex-col gap-3 border-t border-border/80 pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>
-          Showing {visibleStart}-{visibleEnd} of {sales.length} sales
+          Showing {visibleStart}-{visibleEnd} of {filteredSales.length} sales
+          {saleSearch.trim() ? ` matching "${saleSearch.trim()}"` : ""}
         </p>
         <div className="flex items-center gap-2">
           <Button
@@ -771,6 +1180,253 @@ export function SalesManager({
           <DialogFooter showCloseButton>
             <Button onClick={submitOutstandingSale} disabled={submitting}>
               {submitting ? "Recording..." : "Record Sale"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open)
+          if (!open) {
+            setEditError(null)
+            setActiveEditSale(null)
+            setEditDraftItems([emptyDraft])
+            setEditPaymentStatus("paid")
+            setEditPaymentMethod("cash")
+            setEditNotes("")
+            setEditCustomerName("")
+            setEditCustomerPhone("")
+            setEditOutstandingForm(defaultOutstandingForm)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Sale</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {editDraftItems.map((item, index) => {
+              const selectedProduct = item.productId
+                ? productMap.get(item.productId)
+                : null
+              return (
+                <div
+                  key={`edit-${index}-${item.productId}`}
+                  className="grid gap-3 rounded-lg border border-border/80 p-3 md:grid-cols-[1.6fr_0.8fr_1fr_auto]"
+                >
+                  <label className="grid gap-1 text-sm">
+                    Product
+                    <ProductSearchSelect
+                      products={products}
+                      value={item.productId}
+                      onValueChange={(value) => {
+                        const product = productMap.get(value)
+                        setEditDraftItem(index, "productId", value)
+                        if (product) {
+                          setEditDraftItem(
+                            index,
+                            "sellingPrice",
+                            String(product.price)
+                          )
+                        }
+                      }}
+                    />
+                  </label>
+
+                  <label className="grid gap-1 text-sm">
+                    Quantity
+                    <Input
+                      type="number"
+                      min={1}
+                      value={item.quantity}
+                      onChange={(event) =>
+                        setEditDraftItem(index, "quantity", event.target.value)
+                      }
+                    />
+                  </label>
+
+                  <label className="grid gap-1 text-sm">
+                    Selling Price
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={item.sellingPrice}
+                      onChange={(event) =>
+                        setEditDraftItem(
+                          index,
+                          "sellingPrice",
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => removeEditDraftItem(index)}
+                      disabled={editDraftItems.length === 1}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+
+                  {selectedProduct ? (
+                    <p className="md:col-span-4 text-xs text-muted-foreground">
+                      Base price: {formatCurrency(selectedProduct.price)} |
+                      Available: {selectedProduct.quantity}{" "}
+                      {selectedProduct.unit}
+                    </p>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+
+          <Button variant="outline" onClick={addEditDraftItem}>
+            Add Item
+          </Button>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="grid gap-1 text-sm">
+              Payment Status
+              <Select
+                value={editPaymentStatus}
+                onValueChange={(value) =>
+                  setEditPaymentStatus(value as InvoiceStatus)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="unpaid">Unpaid</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+
+            {editPaymentStatus === "paid" ? (
+              <label className="grid gap-1 text-sm">
+                Payment Method
+                <Select
+                  value={editPaymentMethod}
+                  onValueChange={(value) =>
+                    setEditPaymentMethod(
+                      value as "cash" | "mobile-money" | "bank"
+                    )
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="mobile-money">Mobile Money</SelectItem>
+                    <SelectItem value="bank">Bank</SelectItem>
+                  </SelectContent>
+                </Select>
+              </label>
+            ) : null}
+          </div>
+
+          {editPaymentStatus === "unpaid" ? (
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="grid gap-1 text-sm">
+                Customer Names
+                <Input
+                  value={editOutstandingForm.customerName}
+                  onChange={(event) =>
+                    setEditOutstandingForm((current) => ({
+                      ...current,
+                      customerName: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm">
+                Phone Number
+                <Input
+                  value={editOutstandingForm.customerPhone}
+                  onChange={(event) =>
+                    setEditOutstandingForm((current) => ({
+                      ...current,
+                      customerPhone: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm">
+                Payment Date
+                <Input
+                  type="date"
+                  value={editOutstandingForm.paymentDate}
+                  onChange={(event) =>
+                    setEditOutstandingForm((current) => ({
+                      ...current,
+                      paymentDate: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </div>
+          ) : null}
+
+          {editPaymentStatus === "paid" ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="grid gap-1 text-sm">
+                Customer Names (optional)
+                <Input
+                  value={editCustomerName}
+                  onChange={(event) =>
+                    setEditCustomerName(event.target.value)
+                  }
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm">
+                Phone Number (optional)
+                <Input
+                  value={editCustomerPhone}
+                  onChange={(event) =>
+                    setEditCustomerPhone(event.target.value)
+                  }
+                />
+              </label>
+            </div>
+          ) : null}
+
+          <label className="grid gap-1 text-sm">
+            Notes (optional)
+            <textarea
+              value={editNotes}
+              onChange={(event) => setEditNotes(event.target.value)}
+              className="min-h-20 rounded-md border border-border px-3 py-2"
+            />
+          </label>
+
+          <div className="rounded-lg border border-border/80 bg-muted/40 px-4 py-3 text-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              Updated total
+            </p>
+            <p className="mt-1 text-lg font-semibold">
+              {formatCurrency(editTotal)}
+            </p>
+          </div>
+
+          {editError ? (
+            <p className="text-sm text-destructive">{editError}</p>
+          ) : null}
+
+          <DialogFooter showCloseButton>
+            <Button onClick={submitEditSale} disabled={editSubmitting}>
+              {editSubmitting ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

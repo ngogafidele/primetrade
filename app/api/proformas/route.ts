@@ -105,6 +105,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (sale && (sale.approvalStatus ?? "approved") !== "approved") {
+      return NextResponse.json(
+        { success: false, error: "Approve this sale before creating a proforma" },
+        { status: 400 }
+      )
+    }
+
     const inputItems =
       payload.items ??
       sale?.items.map((item) => ({

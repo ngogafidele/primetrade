@@ -23,6 +23,14 @@ const OutstandingDetailsSchema = new Schema(
   { _id: false }
 )
 
+const SaleCustomerSchema = new Schema(
+  {
+    customerName: { type: String, trim: true, default: "" },
+    customerPhone: { type: String, trim: true, default: "" },
+  },
+  { _id: false }
+)
+
 const SaleSchema = new Schema(
   {
     items: { type: [SaleItemSchema], required: true },
@@ -37,8 +45,17 @@ const SaleSchema = new Schema(
       type: String,
       enum: ["cash", "mobile-money", "bank"],
     },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved"],
+      required: true,
+      default: "approved",
+    },
+    approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    approvedAt: { type: Date },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     notes: { type: String, default: "" },
+    customer: { type: SaleCustomerSchema, default: undefined },
     outstanding: { type: OutstandingDetailsSchema, default: undefined },
   },
   { timestamps: true }

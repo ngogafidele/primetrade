@@ -17,12 +17,21 @@ export const OutstandingDetailsSchema = z
   })
   .strict()
 
+export const SaleCustomerSchema = z
+  .object({
+    customerName: z.string().trim().optional(),
+    customerPhone: z.string().trim().optional(),
+  })
+  .strict()
+  .optional()
+
 export const CreateSaleSchema = z
   .object({
     items: z.array(SaleItemSchema).min(1),
     paymentStatus: z.enum(["paid", "unpaid"]),
     paymentMethod: z.enum(["cash", "mobile-money", "bank"]).optional(),
     notes: z.string().optional(),
+    customer: SaleCustomerSchema,
     outstanding: OutstandingDetailsSchema.optional(),
   })
   .strict()

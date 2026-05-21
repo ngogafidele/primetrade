@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { requireAuth } from "@/lib/auth/middleware"
 import { Sale } from "@/lib/db/models/Sale"
 import "@/lib/db/models/User"
+import { approvedSaleFilter } from "@/lib/db/sales-approval"
 import { getKigaliDateParts } from "@/lib/utils/time"
 import { formatCurrency } from "@/lib/utils/format"
 import { generateOutstandingCustomerPDF } from "@/lib/pdf/outstanding-generator"
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
     await connectToDatabase()
 
     const query: Record<string, unknown> = {
+      ...approvedSaleFilter,
       paymentStatus: "unpaid",
       "outstanding.customerName": {
         $regex: `^${escapeRegExp(customerName)}$`,

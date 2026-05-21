@@ -8,6 +8,7 @@ import { Product } from "@/lib/db/models/Product"
 import { ReturnTransaction } from "@/lib/db/models/Return"
 import { Sale } from "@/lib/db/models/Sale"
 import { StockAdjustment } from "@/lib/db/models/StockAdjustment"
+import { approvedSaleDateFilter } from "@/lib/db/sales-approval"
 import { formatCurrency } from "@/lib/utils/format"
 import {
   formatInKigali,
@@ -114,6 +115,7 @@ type ReturnProductImpact = TopMovingProduct
 type RecentSale = {
   _id: string
   createdAt?: Date
+  approvedAt?: Date
   totalAmount: number
   items: Array<{
     name: string
@@ -256,6 +258,7 @@ export default async function ReportsPage({
     $gte: range.from,
     $lt: range.endExclusive,
   }
+  const approvedPeriodFilter = approvedSaleDateFilter(periodFilter)
 
   await connectToDatabase()
 
@@ -288,7 +291,7 @@ export default async function ReportsPage({
       },
     ]),
     Sale.aggregate<SaleTotals>([
-      { $match: { createdAt: periodFilter } },
+      { $match: approvedPeriodFilter },
       { $unwind: { path: "$items", preserveNullAndEmptyArrays: true } },
       {
         $group: {
@@ -405,7 +408,7 @@ export default async function ReportsPage({
     Sale.aggregate<OutstandingSalesTotals>([
       {
         $match: {
-          createdAt: periodFilter,
+          ...approvedPeriodFilter,
           paymentStatus: "unpaid",
         },
       },
@@ -419,7 +422,7 @@ export default async function ReportsPage({
     Sale.aggregate<PaymentMethodTotals>([
       {
         $match: {
-          createdAt: periodFilter,
+          ...approvedPeriodFilter,
           paymentStatus: "paid",
           paymentMethod: { $in: ["cash", "mobile-money", "bank"] },
         },
@@ -432,7 +435,7 @@ export default async function ReportsPage({
       },
     ]),
     Sale.aggregate<TopMovingProduct>([
-      { $match: { createdAt: periodFilter } },
+      { $match: approvedPeriodFilter },
       { $unwind: "$items" },
       {
         $group: {
@@ -519,8 +522,8 @@ export default async function ReportsPage({
         },
       },
     ]),
-    Sale.find({ createdAt: periodFilter })
-      .select("items totalAmount createdAt")
+    Sale.find(approvedPeriodFilter)
+      .select("items totalAmount createdAt approvedAt")
       .sort({ createdAt: -1 })
       .limit(8)
       .lean<RecentSale[]>(),
@@ -591,7 +594,7 @@ export default async function ReportsPage({
   const toLabel = formatDateOnly(range.to)
   const printableRecentSales = recentSales.map((sale) => ({
     _id: sale._id.toString(),
-    createdAt: sale.createdAt?.toISOString(),
+    createdAt: (sale.approvedAt ?? sale.createdAt)?.toISOString(),
     totalAmount: sale.totalAmount,
     items: sale.items.map((item) => ({
       name: item.name,
@@ -825,7 +828,9 @@ export default async function ReportsPage({
               ) : (
                 recentSales.map((sale) => (
                   <TableRow key={sale._id.toString()}>
-                    <TableCell>{formatDateTime(sale.createdAt)}</TableCell>
+                    <TableCell>
+                      {formatDateTime(sale.approvedAt ?? sale.createdAt)}
+                    </TableCell>
                     <TableCell>
                       <span className="whitespace-normal wrap-break-word">
                         {sale.items
