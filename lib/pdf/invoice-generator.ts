@@ -337,7 +337,7 @@ export function generateSalesInvoicePDF(
     "Sales Invoice",
     invoice,
     storeInfo,
-    "Bill To",
+    "Invoice To",
     businessFooterLines
   )
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
+import { ProductSupply } from "@/lib/db/models/ProductSupply"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
 import { CreateProductSchema } from "@/lib/db/validators/product"
 import { syncLowStockAlert } from "@/lib/db/alerts"
@@ -9,6 +10,7 @@ import {
   isDuplicateKeyError,
   productNameExists,
 } from "@/lib/db/products"
+import { parseKigaliDateInput } from "@/lib/utils/time"
 import { ZodError } from "zod"
 
 function getSkuPrefix(name: string) {
@@ -69,7 +71,22 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = CreateProductSchema.parse(await request.json())
-    const { categoryId: _categoryId, ...productInput } = payload
+    const {
+      categoryId: _categoryId,
+      supplierName,
+      suppliedAt: suppliedAtInput,
+      ...productInput
+    } = payload
+    const suppliedAt = suppliedAtInput
+      ? parseKigaliDateInput(suppliedAtInput) ?? new Date(suppliedAtInput)
+      : new Date()
+
+    if (Number.isNaN(suppliedAt.getTime())) {
+      return NextResponse.json(
+        { success: false, error: "Invalid supplied date" },
+        { status: 400 }
+      )
+    }
 
     await connectToDatabase()
 
@@ -85,6 +102,20 @@ export async function POST(request: NextRequest) {
       sku: await generateProductSku(payload.name),
     })
 
+    const supply =
+      product.quantity > 0
+        ? await ProductSupply.create({
+            productId: product._id,
+            sku: product.sku,
+            productName: product.name,
+            supplierName,
+            quantity: product.quantity,
+            unitCost: product.costPrice,
+            suppliedAt,
+            recordedBy: session.userId,
+          })
+        : null
+
     await syncLowStockAlert({
       productId: product._id.toString(),
       name: product.name,
@@ -94,7 +125,7 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(
-      { success: true, data: product },
+      { success: true, data: product, supply },
       { status: 201 }
     )
   } catch (error) {

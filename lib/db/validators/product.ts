@@ -10,7 +10,17 @@ export const CreateProductSchema = z
     costPrice: z.number().min(0),
     price: z.number().min(0),
     categoryId: objectIdSchema.optional(),
+    supplierName: z.string().trim().optional(),
+    suppliedAt: z.string().trim().min(1).optional(),
   })
+  .refine(
+    (value) =>
+      value.quantity === 0 || Boolean(value.supplierName?.trim().length),
+    {
+      message: "Supplier is required when adding stock",
+      path: ["supplierName"],
+    }
+  )
   .strict()
 
 export const UpdateProductSchema = z

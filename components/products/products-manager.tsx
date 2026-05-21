@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { formatCurrency } from "@/lib/utils/format"
-import { FileText } from "lucide-react"
+import { FileText, PackagePlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { formatInKigali } from "@/lib/utils/time"
+import { formatInKigali, formatKigaliDateInput } from "@/lib/utils/time"
 
 type ProductClient = {
   _id: string
@@ -36,8 +36,23 @@ type ProductClient = {
   updatedAt?: string
 }
 
+type ProductSupplyClient = {
+  _id: string
+  productId: string
+  sku: string
+  productName: string
+  supplierName: string
+  quantity: number
+  unitCost: number
+  suppliedAt?: string
+  notes?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
 export type ProductsManagerProps = {
   initialProducts: ProductClient[]
+  initialSupplies: ProductSupplyClient[]
   isAdmin: boolean
 }
 
@@ -49,16 +64,40 @@ type FormState = {
   lowStockThreshold: string
   costPrice: string
   price: string
+  supplierName: string
+  suppliedAt: string
 }
 
-const emptyForm: FormState = {
-  name: "",
-  sku: "",
-  unit: "",
-  quantity: "",
-  lowStockThreshold: "",
-  costPrice: "",
-  price: "",
+type SupplyFormState = {
+  quantity: string
+  unitCost: string
+  supplierName: string
+  suppliedAt: string
+  notes: string
+}
+
+function createEmptyForm(): FormState {
+  return {
+    name: "",
+    sku: "",
+    unit: "",
+    quantity: "",
+    lowStockThreshold: "",
+    costPrice: "",
+    price: "",
+    supplierName: "",
+    suppliedAt: formatKigaliDateInput(new Date()),
+  }
+}
+
+function createEmptySupplyForm(product?: ProductClient | null): SupplyFormState {
+  return {
+    quantity: "",
+    unitCost: product ? String(product.costPrice ?? 0) : "",
+    supplierName: "",
+    suppliedAt: formatKigaliDateInput(new Date()),
+    notes: "",
+  }
 }
 
 const PRODUCTS_PER_PAGE = 20
@@ -74,15 +113,25 @@ function escapeHtml(value: string) {
 
 export function ProductsManager({
   initialProducts,
+  initialSupplies,
   isAdmin,
 }: ProductsManagerProps) {
   const [products, setProducts] = useState(initialProducts)
+  const [supplies, setSupplies] = useState(initialSupplies)
   const [search, setSearch] = useState("")
-  const [formState, setFormState] = useState<FormState>(emptyForm)
+  const [formState, setFormState] = useState<FormState>(() => createEmptyForm())
+  const [supplyForm, setSupplyForm] = useState<SupplyFormState>(() =>
+    createEmptySupplyForm()
+  )
   const [activeProductId, setActiveProductId] = useState<string | null>(null)
+  const [activeSupplyProduct, setActiveSupplyProduct] =
+    useState<ProductClient | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [supplyDialogOpen, setSupplyDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [supplySubmitting, setSupplySubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [supplyError, setSupplyError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
 
   const costValue = Number(formState.costPrice)
@@ -126,9 +175,7 @@ export function ProductsManager({
   }, [currentPage, pageCount])
 
   const resetForm = () => {
-    setFormState({
-      ...emptyForm,
-    })
+    setFormState(createEmptyForm())
     setActiveProductId(null)
     setError(null)
   }
@@ -147,10 +194,19 @@ export function ProductsManager({
       lowStockThreshold: String(product.lowStockThreshold ?? 0),
       costPrice: String(product.costPrice ?? 0),
       price: String(product.price ?? 0),
+      supplierName: "",
+      suppliedAt: formatKigaliDateInput(new Date()),
     })
     setActiveProductId(product._id)
     setError(null)
     setDialogOpen(true)
+  }
+
+  const openSupplyDialog = (product: ProductClient) => {
+    setActiveSupplyProduct(product)
+    setSupplyForm(createEmptySupplyForm(product))
+    setSupplyError(null)
+    setSupplyDialogOpen(true)
   }
 
   const submitForm = async () => {
@@ -172,6 +228,12 @@ export function ProductsManager({
       lowStockThreshold: Number(formState.lowStockThreshold || 0),
       costPrice: Number(formState.costPrice || 0),
       price: Number(formState.price || 0),
+      ...(activeProductId
+        ? {}
+        : {
+            supplierName: formState.supplierName.trim() || undefined,
+            suppliedAt: formState.suppliedAt || undefined,
+          }),
     }
 
     try {
@@ -191,6 +253,7 @@ export function ProductsManager({
       }
 
       const updated = body.data as ProductClient
+      const initialSupply = body.supply as ProductSupplyClient | undefined
 
       setProducts((current) => {
         if (activeProductId) {
@@ -200,6 +263,9 @@ export function ProductsManager({
         }
         return [updated, ...current]
       })
+      if (initialSupply) {
+        setSupplies((current) => [initialSupply, ...current].slice(0, 100))
+      }
       setCurrentPage(1)
 
       setDialogOpen(false)
@@ -208,6 +274,67 @@ export function ProductsManager({
       setError("Failed to save product.")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const submitSupply = async () => {
+    if (!activeSupplyProduct) return
+
+    const quantity = Number(supplyForm.quantity || 0)
+    const unitCost = Number(supplyForm.unitCost || 0)
+
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      setSupplyError("Quantity must be at least 1.")
+      return
+    }
+    if (!Number.isFinite(unitCost) || unitCost < 0) {
+      setSupplyError("Unit cost must be 0 or more.")
+      return
+    }
+    if (!supplyForm.supplierName.trim()) {
+      setSupplyError("Supplier is required.")
+      return
+    }
+
+    setSupplySubmitting(true)
+    setSupplyError(null)
+
+    try {
+      const response = await fetch("/api/product-supplies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: activeSupplyProduct._id,
+          quantity,
+          unitCost,
+          supplierName: supplyForm.supplierName.trim(),
+          suppliedAt: supplyForm.suppliedAt || undefined,
+          notes: supplyForm.notes.trim() || undefined,
+        }),
+      })
+
+      const body = await response.json()
+      if (!response.ok || !body?.success) {
+        setSupplyError(body?.error ?? "Failed to receive stock.")
+        return
+      }
+
+      const updatedProduct = body.data.product as ProductClient
+      const supply = body.data.supply as ProductSupplyClient
+
+      setProducts((current) =>
+        current.map((product) =>
+          product._id === updatedProduct._id ? updatedProduct : product
+        )
+      )
+      setSupplies((current) => [supply, ...current].slice(0, 100))
+      setSupplyDialogOpen(false)
+      setActiveSupplyProduct(null)
+      setSupplyForm(createEmptySupplyForm())
+    } catch {
+      setSupplyError("Failed to receive stock.")
+    } finally {
+      setSupplySubmitting(false)
     }
   }
 
@@ -495,6 +622,36 @@ export function ProductsManager({
                       />
                     </label>
                   </div>
+                  {!activeProductId ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="grid gap-1 text-sm">
+                        Supplier
+                        <Input
+                          placeholder="Supplier name"
+                          value={formState.supplierName}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              supplierName: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="grid gap-1 text-sm">
+                        Supplied Date
+                        <Input
+                          type="date"
+                          value={formState.suppliedAt}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              suppliedAt: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                  ) : null}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1 text-sm">
                       Selling Price
@@ -535,6 +692,118 @@ export function ProductsManager({
                       : activeProductId
                       ? "Save changes"
                       : "Create product"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          ) : null}
+          {isAdmin ? (
+            <Dialog
+              open={supplyDialogOpen}
+              onOpenChange={(open) => {
+                setSupplyDialogOpen(open)
+                if (!open) {
+                  setActiveSupplyProduct(null)
+                  setSupplyError(null)
+                }
+              }}
+            >
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Receive stock</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-3">
+                  {activeSupplyProduct ? (
+                    <p className="text-sm text-muted-foreground">
+                      {activeSupplyProduct.name} - current stock{" "}
+                      {activeSupplyProduct.quantity} {activeSupplyProduct.unit}
+                    </p>
+                  ) : null}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-1 text-sm">
+                      Quantity
+                      <Input
+                        type="number"
+                        min={1}
+                        step="1"
+                        value={supplyForm.quantity}
+                        onChange={(event) =>
+                          setSupplyForm((prev) => ({
+                            ...prev,
+                            quantity: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      Unit Cost
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={supplyForm.unitCost}
+                        onChange={(event) =>
+                          setSupplyForm((prev) => ({
+                            ...prev,
+                            unitCost: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-1 text-sm">
+                      Supplier
+                      <Input
+                        value={supplyForm.supplierName}
+                        onChange={(event) =>
+                          setSupplyForm((prev) => ({
+                            ...prev,
+                            supplierName: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      Supplied Date
+                      <Input
+                        type="date"
+                        value={supplyForm.suppliedAt}
+                        onChange={(event) =>
+                          setSupplyForm((prev) => ({
+                            ...prev,
+                            suppliedAt: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label className="grid gap-1 text-sm">
+                    Notes
+                    <Input
+                      placeholder="Optional"
+                      value={supplyForm.notes}
+                      onChange={(event) =>
+                        setSupplyForm((prev) => ({
+                          ...prev,
+                          notes: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  {supplyError ? (
+                    <p className="text-sm text-destructive">{supplyError}</p>
+                  ) : null}
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSupplyDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={submitSupply} disabled={supplySubmitting}>
+                    {supplySubmitting ? "Saving..." : "Receive stock"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -611,6 +880,14 @@ export function ProductsManager({
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => openSupplyDialog(product)}
+                      >
+                        <PackagePlus className="size-3.5" />
+                        Receive
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => openEdit(product)}
                       >
                         Edit
@@ -631,6 +908,63 @@ export function ProductsManager({
           )}
         </TableBody>
       </Table>
+      {isAdmin ? (
+        <section className="space-y-3 border-t border-border/80 pt-5">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Purchasing
+            </p>
+            <h3 className="text-lg font-semibold">Recent Supplies</h3>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead>Quantity</TableHead>
+                <TableHead>Unit Cost</TableHead>
+                <TableHead>Notes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {supplies.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-muted-foreground">
+                    No supply records yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                supplies.slice(0, 20).map((supply) => (
+                  <TableRow key={supply._id}>
+                    <TableCell>
+                      {supply.suppliedAt
+                        ? formatInKigali(supply.suppliedAt, {
+                            year: "numeric",
+                            month: "short",
+                            day: "2-digit",
+                          })
+                        : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="grid gap-0.5">
+                        <span>{supply.productName}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {supply.sku}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{supply.supplierName}</TableCell>
+                    <TableCell>{supply.quantity}</TableCell>
+                    <TableCell>{formatCurrency(supply.unitCost)}</TableCell>
+                    <TableCell>{supply.notes || "-"}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </section>
+      ) : null}
       <div className="flex flex-col gap-3 border-t border-border/80 pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>
           Showing {visibleStart}-{visibleEnd} of {filteredProducts.length} products
