@@ -38,23 +38,8 @@ type ProductClient = {
   updatedAt?: string
 }
 
-type ProductSupplyClient = {
-  _id: string
-  productId: string
-  sku: string
-  productName: string
-  supplierName: string
-  quantity: number
-  unitCost: number
-  suppliedAt?: string
-  notes?: string
-  createdAt?: string
-  updatedAt?: string
-}
-
 export type ProductsManagerProps = {
   initialProducts: ProductClient[]
-  initialSupplies: ProductSupplyClient[]
   isAdmin: boolean
 }
 
@@ -104,15 +89,6 @@ function createEmptySupplyForm(product?: ProductClient | null): SupplyFormState 
 
 const PRODUCTS_PER_PAGE = 20
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;")
-}
-
 function formatProductDate(value: string | undefined) {
   if (!value) return "-"
 
@@ -125,11 +101,9 @@ function formatProductDate(value: string | undefined) {
 
 export function ProductsManager({
   initialProducts,
-  initialSupplies,
   isAdmin,
 }: ProductsManagerProps) {
   const [products, setProducts] = useState(initialProducts)
-  const [supplies, setSupplies] = useState(initialSupplies)
   const [search, setSearch] = useState("")
   const [formState, setFormState] = useState<FormState>(() => createEmptyForm())
   const [supplyForm, setSupplyForm] = useState<SupplyFormState>(() =>
@@ -265,7 +239,6 @@ export function ProductsManager({
       }
 
       const updated = body.data as ProductClient
-      const initialSupply = body.supply as ProductSupplyClient | undefined
 
       setProducts((current) => {
         if (activeProductId) {
@@ -275,9 +248,6 @@ export function ProductsManager({
         }
         return [updated, ...current]
       })
-      if (initialSupply) {
-        setSupplies((current) => [initialSupply, ...current].slice(0, 100))
-      }
       setCurrentPage(1)
 
       setDialogOpen(false)
@@ -332,14 +302,12 @@ export function ProductsManager({
       }
 
       const updatedProduct = body.data.product as ProductClient
-      const supply = body.data.supply as ProductSupplyClient
 
       setProducts((current) =>
         current.map((product) =>
           product._id === updatedProduct._id ? updatedProduct : product
         )
       )
-      setSupplies((current) => [supply, ...current].slice(0, 100))
       setSupplyDialogOpen(false)
       setActiveSupplyProduct(null)
       setSupplyForm(createEmptySupplyForm())
@@ -378,165 +346,28 @@ export function ProductsManager({
     }
   }
 
-  const produceCatalogPdf = () => {
-    const printWindow = window.open("", "_blank")
-    if (!printWindow) {
-      setError("Allow pop-ups to produce the catalog PDF.")
-      return
+  const produceCatalogPdf = async () => {
+    setError(null)
+
+    try {
+      const response = await fetch("/api/products/catalog/pdf")
+      if (!response.ok) {
+        setError("Failed to download catalog PDF.")
+        return
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "products-catalog.pdf"
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError("Failed to download catalog PDF.")
     }
-
-    const generatedAt = formatInKigali(new Date(), {
-      month: "short",
-      day: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-
-    const rows = products
-      .map((product, index) => {
-        const stockStatus =
-          product.quantity <= (product.lowStockThreshold ?? 0)
-            ? "Low stock"
-            : "In stock"
-
-        return `
-          <tr>
-            <td>${index + 1}</td>
-            <td>
-              <strong>${escapeHtml(product.name)}</strong>
-              <span>${escapeHtml(product.sku)}</span>
-            </td>
-            <td>${escapeHtml(String(product.quantity))} ${escapeHtml(product.unit ?? "pcs")}</td>
-            <td>${escapeHtml(formatProductDate(product.createdAt))}</td>
-            <td>${escapeHtml(formatProductDate(product.lastRestockAt))}</td>
-            <td>${escapeHtml(product.supplierName || "-")}</td>
-            <td>${escapeHtml(String(product.lowStockThreshold ?? 0))}</td>
-            <td>${escapeHtml(formatCurrency(product.costPrice ?? 0))}</td>
-            <td>${escapeHtml(formatCurrency(product.price))}</td>
-            <td>${stockStatus}</td>
-          </tr>
-        `
-      })
-      .join("")
-
-    printWindow.document.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <title>Products Catalog</title>
-          <style>
-            * { box-sizing: border-box; }
-            html {
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            body {
-              margin: 0;
-              padding: 32px;
-              color: #000000;
-              font-family: Arial, sans-serif;
-              background: #ffffff;
-            }
-            header {
-              display: flex;
-              justify-content: space-between;
-              gap: 24px;
-              border-bottom: 3px solid #000000;
-              padding-bottom: 16px;
-              margin-bottom: 24px;
-            }
-            h1 {
-              margin: 0 0 6px;
-              font-size: 28px;
-              letter-spacing: 0;
-            }
-            p {
-              margin: 0;
-              color: #000000;
-              font-size: 13px;
-            }
-            .summary {
-              text-align: right;
-              white-space: nowrap;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              font-size: 12px;
-            }
-            th {
-              background: #d1d5db;
-              color: #000000;
-              text-align: left;
-              border: 1.5px solid #000000;
-              padding: 9px 8px;
-            }
-            td {
-              border: 1.5px solid #000000;
-              padding: 8px;
-              vertical-align: top;
-            }
-            td span {
-              display: block;
-              margin-top: 3px;
-              color: #000000;
-              font-size: 11px;
-            }
-            tr:nth-child(even) td {
-              background: #eeeeee;
-            }
-            @page {
-              size: A4 landscape;
-              margin: 12mm;
-            }
-            @media print {
-              body { padding: 0; }
-            }
-          </style>
-        </head>
-        <body>
-          <header>
-            <div>
-              <h1>Products Catalog</h1>
-              <p>Complete product list for the business.</p>
-            </div>
-            <div class="summary">
-              <p><strong>${products.length}</strong> products</p>
-              <p>Generated ${escapeHtml(generatedAt)}</p>
-            </div>
-          </header>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Product</th>
-                <th>Quantity</th>
-                <th>Recorded</th>
-                <th>Last Restock</th>
-                <th>Supplier</th>
-                <th>Low Stock</th>
-                <th>Cost Price</th>
-                <th>Selling Price</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${
-                rows ||
-                '<tr><td colspan="10">No products found.</td></tr>'
-              }
-            </tbody>
-          </table>
-          <script>
-            window.addEventListener("load", () => {
-              window.print();
-            });
-          </script>
-        </body>
-      </html>
-    `)
-    printWindow.document.close()
   }
 
   return (
@@ -932,63 +763,6 @@ export function ProductsManager({
           )}
         </TableBody>
       </Table>
-      {isAdmin ? (
-        <section className="space-y-3 border-t border-border/80 pt-5">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              Purchasing
-            </p>
-            <h3 className="text-lg font-semibold">Recent Supplies</h3>
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Unit Cost</TableHead>
-                <TableHead>Notes</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {supplies.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground">
-                    No supply records yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                supplies.slice(0, 20).map((supply) => (
-                  <TableRow key={supply._id}>
-                    <TableCell>
-                      {supply.suppliedAt
-                        ? formatInKigali(supply.suppliedAt, {
-                            year: "numeric",
-                            month: "short",
-                            day: "2-digit",
-                          })
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="grid gap-0.5">
-                        <span>{supply.productName}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {supply.sku}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{supply.supplierName}</TableCell>
-                    <TableCell>{supply.quantity}</TableCell>
-                    <TableCell>{formatCurrency(supply.unitCost)}</TableCell>
-                    <TableCell>{supply.notes || "-"}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </section>
-      ) : null}
       <div className="flex flex-col gap-3 border-t border-border/80 pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>
           Showing {visibleStart}-{visibleEnd} of {filteredProducts.length} products
