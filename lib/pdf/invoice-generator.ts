@@ -83,11 +83,11 @@ const logoBox = {
 
 const businessFooterLines = [
   "Payment Methods:",
-  "Equity Bank Account: 4014201273279 (Prime Trade Company Ltd)",
+  "Equity: 4014201273279 (Prime Trade Company Ltd)",
   "Momo Pay: 77876 (Prime Trade Company)",
 ]
 
-const thankYouMessage = "Thank You For Doing Business with Prime Trade Company Ltd"
+const thankYouMessage = "Thank You For Doing Business With Us!"
 const thankYouFooterOffset = 64
 
 const printColor = {
@@ -237,10 +237,11 @@ function writeInvoicePdf(
 
   const tableTop = 320
   const columns = {
-    item: 54,
-    quantity: 286,
-    price: 355,
-    total: 448,
+    no: 54,
+    item: 84,
+    quantity: 292,
+    price: 360,
+    total: 454,
   }
 
   doc
@@ -250,10 +251,11 @@ function writeInvoicePdf(
     .fillColor(printColor.text)
     .font("Helvetica-Bold")
     .fontSize(9)
-    .text("Item", columns.item, tableTop + 8)
-    .text("Qty", columns.quantity, tableTop + 8)
-    .text("Price", columns.price, tableTop + 8)
-    .text("Total", columns.total, tableTop + 8)
+    .text("NO", columns.no, tableTop + 8)
+    .text("ITEM", columns.item, tableTop + 8)
+    .text("QTY", columns.quantity, tableTop + 8)
+    .text("PRICE", columns.price, tableTop + 8)
+    .text("TOTAL", columns.total, tableTop + 8)
 
   let y = tableTop + 32
   data.items.forEach((item, index) => {
@@ -262,17 +264,18 @@ function writeInvoicePdf(
       y = 56
     }
 
-      doc
+    doc
       .fillColor(index % 2 === 0 ? "#ffffff" : printColor.rowBackground)
       .rect(48, y - 7, 499, 34)
       .fill()
       .font("Helvetica")
       .fillColor(printColor.text)
       .fontSize(10)
-      .text(item.description, columns.item, y, { width: 210 })
+      .text(String(index + 1), columns.no, y, { width: 20 })
+      .text(item.description, columns.item, y, { width: 195 })
       .fillColor(printColor.muted)
       .fontSize(9)
-      .text(item.sku ?? "", columns.item, y + 13, { width: 210 })
+      .text(item.sku ?? "", columns.item, y + 13, { width: 195 })
       .fillColor(printColor.text)
       .fontSize(10)
       .text(`${item.quantity} ${item.unit ?? "pcs"}`, columns.quantity, y)

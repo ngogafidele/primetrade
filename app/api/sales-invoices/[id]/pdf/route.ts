@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import mongoose from "mongoose"
 import { connectToDatabase } from "@/lib/db/connection"
 import { requireAuth } from "@/lib/auth/middleware"
 import { Invoice } from "@/lib/db/models/Invoice"
@@ -23,14 +24,15 @@ export async function GET(
 
     const { id } = await context.params
     await connectToDatabase()
-    const invoice = await Invoice.findById(id).populate(
-      "createdBy",
-      "name email"
-    )
+    const invoice = mongoose.isValidObjectId(id)
+      ? await Invoice.findOne({
+          $or: [{ _id: id }, { saleId: id }],
+        }).populate("createdBy", "name email")
+      : null
 
     if (!invoice) {
       return NextResponse.json(
-        { success: false, error: "Invoice not found" },
+        { success: false, error: "Invoice not found for this sale" },
         { status: 404 }
       )
     }

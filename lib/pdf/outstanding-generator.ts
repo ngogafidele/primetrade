@@ -76,11 +76,17 @@ type OutstandingPdfDocument = {
 const logoPath = path.join(process.cwd(), "public", "images", "logo.png")
 
 const businessFooterLines = [
-  "Payements methods",
-  "Equity Bank Account: 4014201273279",
-  "Momo Pay: 77876",
-  "Momo Pay Name: Prime Trade Company",
+  "Payment Methods:",
+  "Equity: 4014201273279 (Prime Trade Company Ltd)",
+  "Momo Pay: 77876 (Prime Trade Company)",
 ]
+
+const thankYouMessage = "Thank You For Doing Business With Us!"
+const thankYouFooterOffset = 64
+const headerRightColumn = {
+  x: 300,
+  width: 247,
+}
 
 const printColor = {
   text: "#000000",
@@ -147,14 +153,26 @@ export async function generateOutstandingCustomerPDF(
     .fillColor(printColor.text)
     .font("Helvetica-Bold")
     .fontSize(22)
-    .text("Outstanding Statement", 310, 58, { align: "right" })
+    .text("Outstanding Statement", headerRightColumn.x, 52, {
+      align: "right",
+      width: headerRightColumn.width,
+    })
     .font("Helvetica")
     .fontSize(10)
     .fillColor(printColor.muted)
-    .text(data.number, 310, 88, { align: "right" })
-    .text(`Generated: ${formatDate(data.generatedAt)}`, 310, 104, {
+    .text(data.number, headerRightColumn.x, 84, {
       align: "right",
+      width: headerRightColumn.width,
     })
+    .text(
+      `Generated: ${formatDate(data.generatedAt)}`,
+      headerRightColumn.x,
+      100,
+      {
+        align: "right",
+        width: headerRightColumn.width,
+      }
+    )
 
   doc
     .moveTo(48, 178)
@@ -187,6 +205,16 @@ export async function generateOutstandingCustomerPDF(
     .text(data.customerPhone ?? "", 330, 236)
 
   const tableTop = 300
+  const columns = {
+    no: 54,
+    saleDate: 82,
+    paymentDate: 148,
+    items: 230,
+    unitPrice: 360,
+    recordedBy: 430,
+    amount: 504,
+  }
+
   doc
     .rect(48, tableTop, 499, 24)
     .fillColor(printColor.headerBackground)
@@ -194,12 +222,13 @@ export async function generateOutstandingCustomerPDF(
     .fillColor(printColor.text)
     .font("Helvetica-Bold")
     .fontSize(9)
-    .text("Sale Date", 54, tableTop + 8)
-    .text("Payment Date", 122, tableTop + 8)
-    .text("Items", 206, tableTop + 8)
-    .text("Unit Price", 346, tableTop + 8)
-    .text("Recorded By", 430, tableTop + 8)
-    .text("Amount", 504, tableTop + 8)
+    .text("NO", columns.no, tableTop + 8)
+    .text("SALE DATE", columns.saleDate, tableTop + 8)
+    .text("PAYMENT DATE", columns.paymentDate, tableTop + 8)
+    .text("ITEMS", columns.items, tableTop + 8)
+    .text("UNIT PRICE", columns.unitPrice, tableTop + 8)
+    .text("RECORDED BY", columns.recordedBy, tableTop + 8)
+    .text("AMOUNT", columns.amount, tableTop + 8)
 
   let y = tableTop + 32
 
@@ -216,12 +245,15 @@ export async function generateOutstandingCustomerPDF(
       .font("Helvetica")
       .fillColor(printColor.text)
       .fontSize(10)
-      .text(formatDate(sale.saleDate), 54, y, { width: 62 })
-      .text(formatDate(sale.paymentDate), 122, y, { width: 78 })
-      .text(sale.items, 206, y, { width: 130 })
-      .text(sale.unitPrices, 346, y, { width: 78 })
-      .text(sale.recordedBy ?? "-", 430, y, { width: 68 })
-      .text(formatCurrency(sale.totalAmount), 504, y, { width: 42 })
+      .text(String(index + 1), columns.no, y, { width: 20 })
+      .text(formatDate(sale.saleDate), columns.saleDate, y, { width: 60 })
+      .text(formatDate(sale.paymentDate), columns.paymentDate, y, {
+        width: 76,
+      })
+      .text(sale.items, columns.items, y, { width: 124 })
+      .text(sale.unitPrices, columns.unitPrice, y, { width: 64 })
+      .text(sale.recordedBy ?? "-", columns.recordedBy, y, { width: 68 })
+      .text(formatCurrency(sale.totalAmount), columns.amount, y, { width: 42 })
 
     y += 44
   })
@@ -239,8 +271,8 @@ export async function generateOutstandingCustomerPDF(
     .font("Helvetica-Bold")
     .fontSize(14)
     .fillColor(printColor.text)
-    .text("Total Outstanding", 330, y + 20)
-    .text(formatCurrency(data.totalAmount), 448, y + 20, { width: 92 })
+    .text("Total Outstanding: ", 318, y + 20)
+    .text(formatCurrency(data.totalAmount), 462, y + 20, { width: 78 })
 
   let footerY = y + 58
   if (footerY > 700) {
@@ -253,6 +285,15 @@ export async function generateOutstandingCustomerPDF(
     .fontSize(9)
     .fillColor(printColor.text)
     .text(businessFooterLines.join("\n"), 48, footerY, { width: 220 })
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .fillColor(printColor.text)
+    .text(thankYouMessage, 170, footerY + thankYouFooterOffset, {
+      align: "center",
+      width: 260,
+    })
 
   doc.end()
 

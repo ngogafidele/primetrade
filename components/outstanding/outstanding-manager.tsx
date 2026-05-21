@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { CheckCircle2, Download, Search } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Download, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { formatCurrency } from "@/lib/utils/format"
@@ -20,9 +20,34 @@ export type OutstandingSaleClient = {
   customerName: string
   customerPhone: string
   paymentDateLabel: string
+  paymentDateStatus: "overdue" | "due" | "upcoming" | "unknown"
   itemSummary: string
   recordedBy: string
   totalAmount: number
+}
+
+function PaymentDateStatusBadge({
+  status,
+}: {
+  status: OutstandingSaleClient["paymentDateStatus"]
+}) {
+  if (status === "overdue") {
+    return (
+      <span className="inline-flex w-fit items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
+        Overdue
+      </span>
+    )
+  }
+
+  if (status === "due") {
+    return (
+      <span className="inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+        Due today
+      </span>
+    )
+  }
+
+  return null
 }
 
 export function OutstandingManager({
@@ -52,6 +77,24 @@ export function OutstandingManager({
     () => filteredSales.reduce((sum, sale) => sum + sale.totalAmount, 0),
     [filteredSales]
   )
+
+  const paymentAlerts = useMemo(() => {
+    return sales.reduce(
+      (alerts, sale) => {
+        if (sale.paymentDateStatus === "overdue") {
+          alerts.overdue += 1
+        }
+        if (sale.paymentDateStatus === "due") {
+          alerts.due += 1
+        }
+
+        return alerts
+      },
+      { overdue: 0, due: 0 }
+    )
+  }, [sales])
+
+  const hasPaymentAlerts = paymentAlerts.overdue > 0 || paymentAlerts.due > 0
 
   const markPaid = async (saleId: string) => {
     setUpdatingId(saleId)
@@ -130,6 +173,29 @@ export function OutstandingManager({
         </div>
       </section>
 
+      {hasPaymentAlerts ? (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0" />
+          <div>
+            <p className="font-medium">Payment reminder</p>
+            <p className="text-sm">
+              {paymentAlerts.overdue > 0
+                ? `${paymentAlerts.overdue} overdue payment${
+                    paymentAlerts.overdue === 1 ? "" : "s"
+                  }`
+                : ""}
+              {paymentAlerts.overdue > 0 && paymentAlerts.due > 0 ? " and " : ""}
+              {paymentAlerts.due > 0
+                ? `${paymentAlerts.due} payment${
+                    paymentAlerts.due === 1 ? "" : "s"
+                  } due today`
+                : ""}
+              .
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
@@ -178,7 +244,14 @@ export function OutstandingManager({
                     <TableCell>{sale.createdAtLabel}</TableCell>
                     <TableCell>{sale.customerName}</TableCell>
                     <TableCell>{sale.customerPhone}</TableCell>
-                    <TableCell>{sale.paymentDateLabel}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <span>{sale.paymentDateLabel}</span>
+                        <PaymentDateStatusBadge
+                          status={sale.paymentDateStatus}
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="max-w-sm whitespace-normal wrap-break-word">
                         {sale.itemSummary}

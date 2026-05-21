@@ -2,7 +2,7 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { Sale } from "@/lib/db/models/Sale"
 import "@/lib/db/models/User"
 import { requireServerSession } from "@/lib/auth/server"
-import { formatInKigali } from "@/lib/utils/time"
+import { formatInKigali, getKigaliDateParts } from "@/lib/utils/time"
 import { OutstandingManager } from "@/components/outstanding/outstanding-manager"
 
 type PopulatedSaleUser = {
@@ -37,6 +37,25 @@ function isPopulatedSaleUser(
   return typeof value === "object" && value !== null && "_id" in value
 }
 
+function getKigaliDateNumber(dateInput: Date | undefined) {
+  if (!dateInput) return null
+
+  const parts = getKigaliDateParts(dateInput)
+  return parts.year * 10000 + parts.month * 100 + parts.day
+}
+
+function getPaymentDateStatus(paymentDate: Date | undefined) {
+  const paymentDay = getKigaliDateNumber(paymentDate)
+  if (!paymentDay) return "unknown"
+
+  const today = getKigaliDateNumber(new Date())
+  if (!today) return "unknown"
+
+  if (paymentDay < today) return "overdue"
+  if (paymentDay === today) return "due"
+  return "upcoming"
+}
+
 export default async function OutstandingPage() {
   await requireServerSession()
   await connectToDatabase()
@@ -60,9 +79,6 @@ export default async function OutstandingPage() {
         year: "numeric",
         month: "short",
         day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
       }),
       customerName: sale.outstanding?.customerName ?? "Not recorded",
       customerPhone: sale.outstanding?.customerPhone ?? "Not recorded",
@@ -71,6 +87,7 @@ export default async function OutstandingPage() {
         month: "short",
         day: "2-digit",
       }),
+      paymentDateStatus: getPaymentDateStatus(sale.outstanding?.paymentDate),
       itemSummary: itemSummary || "No items",
       recordedBy,
       totalAmount: sale.totalAmount,
