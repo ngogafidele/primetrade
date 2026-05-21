@@ -67,20 +67,27 @@ type InvoicePdfDocument = {
     text: string,
     x?: number,
     y?: number,
-    options?: { align?: "left" | "right" | "center"; width?: number }
+    options?: {
+      align?: "left" | "right" | "center"
+      width?: number
+    }
   ): InvoicePdfDocument
-  heightOfString(text: string, options?: { width?: number }): number
 }
+
+type InvoiceLogoDocument = Pick<
+  InvoicePdfDocument,
+  "fill" | "fillColor" | "fontSize" | "image" | "rect" | "text"
+>
 
 const logoPath = path.join(process.cwd(), "public", "images", "logo.png")
 const logoBox = {
   x: 42,
   y: 24,
-  width: 174,
-  height: 174,
+  width: 136,
+  height: 136,
   imageX: 48,
   imageY: 30,
-  imageFit: [162, 162] as [number, number],
+  imageFit: [124, 124] as [number, number],
 }
 
 const businessFooterLines = [
@@ -89,7 +96,7 @@ const businessFooterLines = [
   "Momo Pay: 77876 (Prime Trade Company)",
 ]
 
-const thankYouMessage = "Thank You For Doing Business With Us!"
+const thankYouMessage = "Thank you for doing business with us!"
 const thankYouFooterOffset = 64
 
 const printColor = {
@@ -98,8 +105,26 @@ const printColor = {
   accent: "#000000",
   headerBackground: "#1d4ed8",
   headerText: "#ffffff",
-  rowBackground: "#DCE1F0",
+  rowBackground: "#BFDBFE",
   rule: "#000000",
+}
+const tableHeaderHeight = 24
+const tableRowHeight = 18
+
+function formatTableText(value: string | number | undefined, maxLength?: number) {
+  const text = String(value ?? "-").replace(/\s+/g, " ").trim() || "-"
+
+  if (!maxLength || text.length <= maxLength) return text
+
+  return `${text.slice(0, Math.max(0, maxLength - 3))}...`
+}
+
+function estimateTextHeight(text: string, charsPerLine = 48, lineHeight = 12) {
+  const lines = text.split(/\r?\n/).reduce((total, line) => {
+    return total + Math.max(1, Math.ceil(line.length / charsPerLine))
+  }, 0)
+
+  return lines * lineHeight
 }
 
 function getLogoBuffer() {
@@ -107,7 +132,7 @@ function getLogoBuffer() {
   return readFileSync(logoPath)
 }
 
-function drawLogo(doc: InvoicePdfDocument, storeInfo: StoreInfo) {
+function drawLogo(doc: InvoiceLogoDocument, storeInfo: StoreInfo) {
   doc
     .rect(logoBox.x, logoBox.y, logoBox.width, logoBox.height)
     .fillColor("#ffffff")
@@ -159,7 +184,7 @@ function writeInvoicePdf(
   title: string,
   data: PdfDocumentData,
   storeInfo: StoreInfo,
-  recipientLabel = "Bill To",
+  recipientLabel = "Invoice to",
   footerLines: string[] = []
 ) {
   if (!PDFDocument) {
@@ -186,19 +211,19 @@ function writeInvoicePdf(
   doc
     .fillColor(printColor.text)
     .font("Helvetica-Bold")
-    .fontSize(22)
-    .text(title, 340, 58, { align: "right" })
+    .fontSize(18)
+    .text(title, 340, 50, { align: "right" })
     .font("Helvetica")
     .fontSize(10)
     .fillColor(printColor.muted)
-    .text(data.number, 340, 88, { align: "right" })
-    .text(`Date: ${formatDate(data.date)}`, 340, 104, { align: "right" })
+    .text(data.number, 340, 76, { align: "right" })
+    .text(`Date: ${formatDate(data.date)}`, 340, 92, { align: "right" })
 
-  let metaLine = 104
+  let metaLine = 92
 
   if (data.status) {
-    doc.text(`Status: ${data.status}`, 340, 120, { align: "right" })
-    metaLine = 120
+    doc.text(`Status: ${data.status}`, 340, 108, { align: "right" })
+    metaLine = 108
   }
 
   if (data.processedBy) {
@@ -208,8 +233,8 @@ function writeInvoicePdf(
   }
 
   doc
-    .moveTo(48, 210)
-    .lineTo(547, 210)
+    .moveTo(48, 166)
+    .lineTo(547, 166)
     .lineWidth(1.5)
     .strokeColor(printColor.accent)
     .stroke()
@@ -218,27 +243,27 @@ function writeInvoicePdf(
     .fontSize(11)
     .font("Helvetica-Bold")
     .fillColor(printColor.text)
-    .text(storeInfo.name ?? "Prime Trade Inventory", 48, 230)
+    .text(storeInfo.name ?? "Prime Trade Inventory", 48, 180)
     .font("Helvetica")
     .fontSize(10)
     .fillColor(printColor.muted)
-    .text(storeInfo.address ?? "", 48, 248)
-    .text(storeInfo.phone ?? "", 48, 262)
-    .text(storeInfo.email ?? "", 48, 276)
+    .text(storeInfo.address ?? "", 48, 196)
+    .text(storeInfo.phone ?? "", 48, 209)
+    .text(storeInfo.email ?? "", 48, 222)
 
   doc
     .fontSize(11)
     .font("Helvetica-Bold")
     .fillColor(printColor.text)
-    .text(recipientLabel, 330, 230)
+    .text(recipientLabel, 330, 180)
     .font("Helvetica")
     .fontSize(10)
     .fillColor(printColor.muted)
-    .text(data.customerName, 330, 248)
-    .text(data.customerEmail ?? "", 330, 262)
-    .text(data.customerPhone ?? "", 330, 276)
+    .text(data.customerName, 330, 196)
+    .text(data.customerEmail ?? "", 330, 209)
+    .text(data.customerPhone ?? "", 330, 222)
 
-  const tableTop = 320
+  const tableTop = 262
   const columns = {
     no: 54,
     item: 84,
@@ -248,7 +273,7 @@ function writeInvoicePdf(
   }
 
   doc
-    .rect(48, tableTop, 499, 24)
+    .rect(48, tableTop, 499, tableHeaderHeight)
     .fillColor(printColor.headerBackground)
     .fill()
     .fillColor(printColor.headerText)
@@ -258,35 +283,52 @@ function writeInvoicePdf(
     .text("ITEM", columns.item, tableTop + 8)
     .text("QTY", columns.quantity, tableTop + 8)
     .text("PRICE", columns.price, tableTop + 8)
-    .text("TOTAL", columns.total, tableTop + 8)
+    .text("AMOUNT", columns.total, tableTop + 8)
 
-  let y = tableTop + 32
+  let rowTop = tableTop + tableHeaderHeight
   data.items.forEach((item, index) => {
-    if (y > 700) {
+    if (rowTop + tableRowHeight > 724) {
       doc.addPage()
-      y = 56
+      rowTop = 56
     }
+
+    const textY = rowTop + 5
+    const itemLabel = item.sku
+      ? `${item.description} (${item.sku})`
+      : item.description
 
     doc
       .fillColor(index % 2 === 0 ? "#ffffff" : printColor.rowBackground)
-      .rect(48, y - 7, 499, 34)
+      .rect(48, rowTop, 499, tableRowHeight)
       .fill()
       .font("Helvetica")
       .fillColor(printColor.text)
-      .fontSize(10)
-      .text(String(index + 1), columns.no, y, { width: 20 })
-      .text(item.description, columns.item, y, { width: 195 })
-      .fillColor(printColor.muted)
-      .fontSize(9)
-      .text(item.sku ?? "", columns.item, y + 13, { width: 195 })
-      .fillColor(printColor.text)
-      .fontSize(10)
-      .text(`${item.quantity} ${item.unit ?? "pcs"}`, columns.quantity, y)
-      .text(formatCurrency(item.unitPrice), columns.price, y, { width: 82 })
-      .text(formatCurrency(item.lineTotal), columns.total, y, { width: 92 })
+      .fontSize(8)
+      .text(String(index + 1), columns.no, textY, {
+        width: 20,
+      })
+      .text(formatTableText(itemLabel, 42), columns.item, textY, {
+        width: 195,
+      })
+      .text(
+        formatTableText(`${item.quantity} ${item.unit ?? "pcs"}`),
+        columns.quantity,
+        textY,
+        {
+          width: 62,
+        }
+      )
+      .text(formatCurrency(item.unitPrice), columns.price, textY, {
+        width: 82,
+      })
+      .text(formatCurrency(item.lineTotal), columns.total, textY, {
+        width: 92,
+      })
 
-    y += 36
+    rowTop += tableRowHeight
   })
+
+  let y = rowTop
 
   if (y > 660) {
     doc.addPage()
@@ -314,7 +356,7 @@ function writeInvoicePdf(
       .fillColor(printColor.muted)
       .text(noteText, 48, y + 38, { width: 260 })
 
-    const noteHeight = doc.heightOfString(noteText, { width: 260 })
+    const noteHeight = estimateTextHeight(noteText)
     nextSectionY = Math.max(nextSectionY, y + 66 + noteHeight)
   }
 
@@ -364,7 +406,7 @@ export function generateSalesInvoicePDF(
     "Sales Invoice",
     invoice,
     storeInfo,
-    "Invoice To",
+    "Invoice to",
     businessFooterLines
   )
 }
@@ -377,7 +419,7 @@ export function generateProformaPDF(
     "Proforma Invoice",
     proforma,
     storeInfo,
-    "Proforma To",
+    "Proforma to",
     businessFooterLines
   )
 }

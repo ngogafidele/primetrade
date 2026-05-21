@@ -63,7 +63,10 @@ type ReceiptPdfDocument = {
     text: string,
     x?: number,
     y?: number,
-    options?: { align?: "left" | "right" | "center"; width?: number }
+    options?: {
+      align?: "left" | "right" | "center"
+      width?: number
+    }
   ): ReceiptPdfDocument
   moveTo(x: number, y: number): ReceiptPdfDocument
   lineTo(x: number, y: number): ReceiptPdfDocument
@@ -71,18 +74,27 @@ type ReceiptPdfDocument = {
   strokeColor(color: string): ReceiptPdfDocument
   stroke(): ReceiptPdfDocument
   addPage(): ReceiptPdfDocument
-  heightOfString(text: string, options?: { width?: number }): number
 }
+
+type ReceiptLogoDocument = Pick<
+  ReceiptPdfDocument,
+  "fill" | "fillColor" | "fontSize" | "image" | "rect" | "text"
+>
+
+type ReceiptTableDocument = Pick<
+  ReceiptPdfDocument,
+  "addPage" | "fill" | "fillColor" | "font" | "fontSize" | "rect" | "text"
+>
 
 const logoPath = path.join(process.cwd(), "public", "images", "logo.png")
 const logoBox = {
   x: 42,
   y: 24,
-  width: 174,
-  height: 174,
+  width: 136,
+  height: 136,
   imageX: 48,
   imageY: 30,
-  imageFit: [162, 162] as [number, number],
+  imageFit: [124, 124] as [number, number],
 }
 
 const businessFooterLines = [
@@ -101,8 +113,26 @@ const printColor = {
   accent: "#000000",
   headerBackground: "#1d4ed8",
   headerText: "#ffffff",
-  rowBackground: "#eeeeee",
+  rowBackground: "#BFDBFE",
   rule: "#000000",
+}
+const tableHeaderHeight = 22
+const tableRowHeight = 16
+
+function formatTableText(value: string | number | undefined, maxLength?: number) {
+  const text = String(value ?? "-").replace(/\s+/g, " ").trim() || "-"
+
+  if (!maxLength || text.length <= maxLength) return text
+
+  return `${text.slice(0, Math.max(0, maxLength - 3))}...`
+}
+
+function estimateTextHeight(text: string, charsPerLine = 48, lineHeight = 12) {
+  const lines = text.split(/\r?\n/).reduce((total, line) => {
+    return total + Math.max(1, Math.ceil(line.length / charsPerLine))
+  }, 0)
+
+  return lines * lineHeight
 }
 
 function getLogoBuffer() {
@@ -110,7 +140,7 @@ function getLogoBuffer() {
   return readFileSync(logoPath)
 }
 
-function drawLogo(doc: ReceiptPdfDocument, storeInfo: StoreInfo) {
+function drawLogo(doc: ReceiptLogoDocument, storeInfo: StoreInfo) {
   doc
     .rect(logoBox.x, logoBox.y, logoBox.width, logoBox.height)
     .fillColor("#ffffff")
@@ -159,7 +189,7 @@ function formatDate(value: Date | string | undefined) {
 }
 
 function renderItemsTable(
-  doc: ReceiptPdfDocument,
+  doc: ReceiptTableDocument,
   title: string,
   items: ReceiptItem[],
   startY: number
@@ -175,7 +205,7 @@ function renderItemsTable(
   y += 16
 
   doc
-    .rect(48, y, 499, 22)
+    .rect(48, y, 499, tableHeaderHeight)
     .fillColor(printColor.headerBackground)
     .fill()
     .fillColor(printColor.headerText)
@@ -186,35 +216,43 @@ function renderItemsTable(
     .text("Price", 355, y + 7)
     .text("Total", 448, y + 7)
 
-  y += 28
+  let rowTop = y + tableHeaderHeight
 
   items.forEach((item, index) => {
-    if (y > 700) {
+    if (rowTop + tableRowHeight > 724) {
       doc.addPage()
-      y = 56
+      rowTop = 56
     }
+
+    const textY = rowTop + 5
+    const itemLabel = item.sku
+      ? `${item.description} (${item.sku})`
+      : item.description
 
     doc
       .fillColor(index % 2 === 0 ? "#ffffff" : printColor.rowBackground)
-      .rect(48, y - 6, 499, 32)
+      .rect(48, rowTop, 499, tableRowHeight)
       .fill()
       .font("Helvetica")
       .fillColor(printColor.text)
-      .fontSize(10)
-      .text(item.description, 54, y, { width: 210 })
-      .fillColor(printColor.muted)
-      .fontSize(9)
-      .text(item.sku ?? "", 54, y + 12, { width: 210 })
-      .fillColor(printColor.text)
-      .fontSize(10)
-      .text(`${item.quantity} ${item.unit ?? "pcs"}`, 286, y)
-      .text(formatCurrency(item.unitPrice), 355, y, { width: 82 })
-      .text(formatCurrency(item.lineTotal), 448, y, { width: 92 })
+      .fontSize(8)
+      .text(formatTableText(itemLabel, 44), 54, textY, {
+        width: 210,
+      })
+      .text(formatTableText(`${item.quantity} ${item.unit ?? "pcs"}`), 286, textY, {
+        width: 62,
+      })
+      .text(formatCurrency(item.unitPrice), 355, textY, {
+        width: 82,
+      })
+      .text(formatCurrency(item.lineTotal), 448, textY, {
+        width: 92,
+      })
 
-    y += 34
+    rowTop += tableRowHeight
   })
 
-  return y + 6
+  return rowTop + 6
 }
 
 export async function generateReturnReceiptPDF(
@@ -245,23 +283,23 @@ export async function generateReturnReceiptPDF(
   doc
     .fillColor(printColor.text)
     .font("Helvetica-Bold")
-    .fontSize(22)
-    .text("Return Statement", 340, 58, { align: "right" })
+    .fontSize(18)
+    .text("Return Statement", 340, 50, { align: "right" })
     .font("Helvetica")
     .fontSize(10)
     .fillColor(printColor.muted)
-    .text(receipt.receiptNumber, 340, 88, { align: "right" })
-    .text(`Date: ${formatDate(receipt.date)}`, 340, 104, { align: "right" })
+    .text(receipt.receiptNumber, 340, 76, { align: "right" })
+    .text(`Date: ${formatDate(receipt.date)}`, 340, 92, { align: "right" })
 
   if (receipt.processedBy) {
-    doc.text(`Processed by: ${receipt.processedBy}`, 340, 120, {
+    doc.text(`Processed by: ${receipt.processedBy}`, 340, 108, {
       align: "right",
     })
   }
 
   doc
-    .moveTo(48, 210)
-    .lineTo(547, 210)
+    .moveTo(48, 166)
+    .lineTo(547, 166)
     .lineWidth(1.5)
     .strokeColor(printColor.accent)
     .stroke()
@@ -270,15 +308,15 @@ export async function generateReturnReceiptPDF(
     .fontSize(11)
     .font("Helvetica-Bold")
     .fillColor(printColor.text)
-    .text(storeInfo.name ?? "Prime Trade Inventory", 48, 230)
+    .text(storeInfo.name ?? "Prime Trade Inventory", 48, 180)
     .font("Helvetica")
     .fontSize(10)
     .fillColor(printColor.muted)
-    .text(storeInfo.address ?? "", 48, 248)
-    .text(storeInfo.phone ?? "", 48, 262)
-    .text(storeInfo.email ?? "", 48, 276)
+    .text(storeInfo.address ?? "", 48, 196)
+    .text(storeInfo.phone ?? "", 48, 209)
+    .text(storeInfo.email ?? "", 48, 222)
 
-  let y = 320
+  let y = 262
   y = renderItemsTable(doc, "Returned Items", receipt.returnItems, y)
 
   if (y > 660) {
@@ -306,7 +344,7 @@ export async function generateReturnReceiptPDF(
       .fillColor(printColor.muted)
       .text(noteText, 48, y + 38, { width: 260 })
 
-    const noteHeight = doc.heightOfString(noteText, { width: 260 })
+    const noteHeight = estimateTextHeight(noteText)
     footerY = Math.max(footerY, y + 66 + noteHeight)
   }
 

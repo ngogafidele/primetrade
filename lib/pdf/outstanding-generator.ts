@@ -65,7 +65,10 @@ type OutstandingPdfDocument = {
     text: string,
     x?: number,
     y?: number,
-    options?: { align?: "left" | "right" | "center"; width?: number }
+    options?: {
+      align?: "left" | "right" | "center"
+      width?: number
+    }
   ): OutstandingPdfDocument
   moveTo(x: number, y: number): OutstandingPdfDocument
   lineTo(x: number, y: number): OutstandingPdfDocument
@@ -73,8 +76,12 @@ type OutstandingPdfDocument = {
   strokeColor(color: string): OutstandingPdfDocument
   stroke(): OutstandingPdfDocument
   addPage(): OutstandingPdfDocument
-  heightOfString(text: string, options?: { width?: number }): number
 }
+
+type OutstandingLogoDocument = Pick<
+  OutstandingPdfDocument,
+  "fillColor" | "fontSize" | "image" | "text"
+>
 
 const logoPath = path.join(process.cwd(), "public", "images", "logo.png")
 
@@ -97,8 +104,26 @@ const printColor = {
   accent: "#000000",
   headerBackground: "#1d4ed8",
   headerText: "#ffffff",
-  rowBackground: "#eeeeee",
+  rowBackground: "#BFDBFE",
   rule: "#000000",
+}
+const tableHeaderHeight = 24
+const tableRowHeight = 18
+
+function formatTableText(value: string | number | undefined, maxLength?: number) {
+  const text = String(value ?? "-").replace(/\s+/g, " ").trim() || "-"
+
+  if (!maxLength || text.length <= maxLength) return text
+
+  return `${text.slice(0, Math.max(0, maxLength - 3))}...`
+}
+
+function estimateTextHeight(text: string, charsPerLine = 48, lineHeight = 12) {
+  const lines = text.split(/\r?\n/).reduce((total, line) => {
+    return total + Math.max(1, Math.ceil(line.length / charsPerLine))
+  }, 0)
+
+  return lines * lineHeight
 }
 
 function getLogoBuffer() {
@@ -115,11 +140,11 @@ function formatDate(value: Date | string | undefined) {
   }).format(new Date(value))
 }
 
-function drawLogo(doc: OutstandingPdfDocument, storeInfo: StoreInfo) {
+function drawLogo(doc: OutstandingLogoDocument, storeInfo: StoreInfo) {
   const logoBuffer = getLogoBuffer()
   try {
     if (!logoBuffer) throw new Error("Logo not found")
-    doc.image(logoBuffer, 48, 30, { fit: [124, 124] })
+    doc.image(logoBuffer, 48, 30, { fit: [96, 96] })
   } catch {
     doc
       .fontSize(16)
@@ -156,22 +181,22 @@ export async function generateOutstandingCustomerPDF(
   doc
     .fillColor(printColor.text)
     .font("Helvetica-Bold")
-    .fontSize(22)
-    .text("Loan Statement", headerRightColumn.x, 52, {
+    .fontSize(18)
+    .text("Loan Statement", headerRightColumn.x, 48, {
       align: "right",
       width: headerRightColumn.width,
     })
     .font("Helvetica")
     .fontSize(10)
     .fillColor(printColor.muted)
-    .text(data.number, headerRightColumn.x, 84, {
+    .text(data.number, headerRightColumn.x, 74, {
       align: "right",
       width: headerRightColumn.width,
     })
     .text(
       `Generated: ${formatDate(data.generatedAt)}`,
       headerRightColumn.x,
-      100,
+      90,
       {
         align: "right",
         width: headerRightColumn.width,
@@ -179,8 +204,8 @@ export async function generateOutstandingCustomerPDF(
     )
 
   doc
-    .moveTo(48, 178)
-    .lineTo(547, 178)
+    .moveTo(48, 136)
+    .lineTo(547, 136)
     .lineWidth(1.5)
     .strokeColor(printColor.accent)
     .stroke()
@@ -189,26 +214,26 @@ export async function generateOutstandingCustomerPDF(
     .fontSize(11)
     .font("Helvetica-Bold")
     .fillColor(printColor.text)
-    .text(storeInfo.name ?? "Prime Trade Inventory", 48, 204)
+    .text(storeInfo.name ?? "Prime Trade Inventory", 48, 150)
     .font("Helvetica")
     .fontSize(10)
     .fillColor(printColor.muted)
-    .text(storeInfo.address ?? "", 48, 222)
-    .text(storeInfo.phone ?? "", 48, 236)
-    .text(storeInfo.email ?? "", 48, 250)
+    .text(storeInfo.address ?? "", 48, 166)
+    .text(storeInfo.phone ?? "", 48, 179)
+    .text(storeInfo.email ?? "", 48, 192)
 
   doc
     .fontSize(11)
     .font("Helvetica-Bold")
     .fillColor(printColor.text)
-    .text("Customer", 330, 204)
+    .text("Customer", 330, 150)
     .font("Helvetica")
     .fontSize(10)
     .fillColor(printColor.muted)
-    .text(data.customerName, 330, 222)
-    .text(data.customerPhone ?? "", 330, 236)
+    .text(data.customerName, 330, 166)
+    .text(data.customerPhone ?? "", 330, 179)
 
-  const tableTop = 300
+  const tableTop = 230
   const columns = {
     no: 54,
     saleDate: 82,
@@ -220,7 +245,7 @@ export async function generateOutstandingCustomerPDF(
   }
 
   doc
-    .rect(48, tableTop, 499, 24)
+    .rect(48, tableTop, 499, tableHeaderHeight)
     .fillColor(printColor.headerBackground)
     .fill()
     .fillColor(printColor.headerText)
@@ -234,33 +259,49 @@ export async function generateOutstandingCustomerPDF(
     .text("RECORDED BY", columns.recordedBy, tableTop + 8)
     .text("AMOUNT", columns.amount, tableTop + 8)
 
-  let y = tableTop + 32
+  let rowTop = tableTop + tableHeaderHeight
 
   data.sales.forEach((sale, index) => {
-    if (y > 700) {
+    if (rowTop + tableRowHeight > 724) {
       doc.addPage()
-      y = 56
+      rowTop = 56
     }
+
+    const textY = rowTop + 5
 
     doc
       .fillColor(index % 2 === 0 ? "#ffffff" : printColor.rowBackground)
-      .rect(48, y - 7, 499, 42)
+      .rect(48, rowTop, 499, tableRowHeight)
       .fill()
       .font("Helvetica")
       .fillColor(printColor.text)
-      .fontSize(10)
-      .text(String(index + 1), columns.no, y, { width: 20 })
-      .text(formatDate(sale.saleDate), columns.saleDate, y, { width: 60 })
-      .text(formatDate(sale.paymentDate), columns.paymentDate, y, {
+      .fontSize(8)
+      .text(String(index + 1), columns.no, textY, {
+        width: 20,
+      })
+      .text(formatDate(sale.saleDate), columns.saleDate, textY, {
+        width: 60,
+      })
+      .text(formatDate(sale.paymentDate), columns.paymentDate, textY, {
         width: 76,
       })
-      .text(sale.items, columns.items, y, { width: 124 })
-      .text(sale.unitPrices, columns.unitPrice, y, { width: 64 })
-      .text(sale.recordedBy ?? "-", columns.recordedBy, y, { width: 68 })
-      .text(formatCurrency(sale.totalAmount), columns.amount, y, { width: 42 })
+      .text(formatTableText(sale.items, 28), columns.items, textY, {
+        width: 124,
+      })
+      .text(formatTableText(sale.unitPrices, 14), columns.unitPrice, textY, {
+        width: 64,
+      })
+      .text(formatTableText(sale.recordedBy, 14), columns.recordedBy, textY, {
+        width: 68,
+      })
+      .text(formatCurrency(sale.totalAmount), columns.amount, textY, {
+        width: 42,
+      })
 
-    y += 44
+    rowTop += tableRowHeight
   })
+
+  let y = rowTop
 
   if (y > 660) {
     doc.addPage()
@@ -293,7 +334,7 @@ export async function generateOutstandingCustomerPDF(
       .fillColor(printColor.muted)
       .text(noteText, 48, y + 38, { width: 260 })
 
-    const noteHeight = doc.heightOfString(noteText, { width: 260 })
+    const noteHeight = estimateTextHeight(noteText)
     footerY = Math.max(footerY, y + 66 + noteHeight)
   }
 

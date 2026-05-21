@@ -1,9 +1,9 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, Bell, CheckCircle2, Clock } from "lucide-react"
+import { AlertTriangle, Bell, CheckCircle2, Clock, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/utils/format"
 
@@ -33,6 +33,7 @@ export function HeaderNotificationsButton({
   notifications: HeaderNotifications
 }) {
   const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   const totalCount = useMemo(
     () =>
       notifications.pendingSales.length +
@@ -41,8 +42,38 @@ export function HeaderNotificationsButton({
     [notifications]
   )
 
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+
+      if (
+        containerRef.current &&
+        target instanceof Node &&
+        !containerRef.current.contains(target)
+      ) {
+        setOpen(false)
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [open])
+
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <Button
         type="button"
         variant="outline"
@@ -72,6 +103,16 @@ export function HeaderNotificationsButton({
             <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
               {totalCount}
             </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Close notifications"
+              onClick={() => setOpen(false)}
+              className="-mr-1"
+            >
+              <X className="size-4" />
+            </Button>
           </div>
 
           {totalCount === 0 ? (
@@ -86,6 +127,7 @@ export function HeaderNotificationsButton({
                 icon={<Bell className="size-4 text-primary" />}
                 items={notifications.pendingSales}
                 label="Sales to approve"
+                onNavigate={() => setOpen(false)}
                 renderItem={(sale) => (
                   <>
                     <span>{formatCurrency(sale.totalAmount)}</span>
@@ -101,6 +143,7 @@ export function HeaderNotificationsButton({
                 icon={<Clock className="size-4 text-amber-600" />}
                 items={notifications.dueLoans}
                 label="Loans due today"
+                onNavigate={() => setOpen(false)}
                 renderItem={(loan) => (
                   <>
                     <span>{loan.customerName}</span>
@@ -117,6 +160,7 @@ export function HeaderNotificationsButton({
                 icon={<AlertTriangle className="size-4 text-destructive" />}
                 items={notifications.overdueLoans}
                 label="Overdue loans"
+                onNavigate={() => setOpen(false)}
                 renderItem={(loan) => (
                   <>
                     <span>{loan.customerName}</span>
@@ -139,12 +183,14 @@ function NotificationGroup<T>({
   icon,
   items,
   label,
+  onNavigate,
   renderItem,
 }: {
   href: string
   icon: ReactNode
   items: T[]
   label: string
+  onNavigate: () => void
   renderItem: (item: T) => ReactNode
 }) {
   if (items.length === 0) return null
@@ -156,7 +202,11 @@ function NotificationGroup<T>({
           {icon}
           <span>{label}</span>
         </div>
-        <Link className="text-xs font-medium text-primary hover:underline" href={href}>
+        <Link
+          className="text-xs font-medium text-primary hover:underline"
+          href={href}
+          onClick={onNavigate}
+        >
           View
         </Link>
       </div>

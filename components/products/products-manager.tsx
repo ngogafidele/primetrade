@@ -408,6 +408,7 @@ export function ProductsManager({
               <span>${escapeHtml(product.sku)}</span>
             </td>
             <td>${escapeHtml(String(product.quantity))} ${escapeHtml(product.unit ?? "pcs")}</td>
+            <td>${escapeHtml(formatProductDate(product.createdAt))}</td>
             <td>${escapeHtml(formatProductDate(product.lastRestockAt))}</td>
             <td>${escapeHtml(product.supplierName || "-")}</td>
             <td>${escapeHtml(String(product.lowStockThreshold ?? 0))}</td>
@@ -511,6 +512,7 @@ export function ProductsManager({
                 <th>#</th>
                 <th>Product</th>
                 <th>Quantity</th>
+                <th>Recorded</th>
                 <th>Last Restock</th>
                 <th>Supplier</th>
                 <th>Low Stock</th>
@@ -522,7 +524,7 @@ export function ProductsManager({
             <tbody>
               ${
                 rows ||
-                '<tr><td colspan="9">No products found.</td></tr>'
+                '<tr><td colspan="10">No products found.</td></tr>'
               }
             </tbody>
           </table>
@@ -846,6 +848,7 @@ export function ProductsManager({
             <TableHead>SKU</TableHead>
             <TableHead>Quantity</TableHead>
             <TableHead>Unit</TableHead>
+            <TableHead>Recorded</TableHead>
             <TableHead>Last Restock</TableHead>
             <TableHead>Supplier</TableHead>
             <TableHead>Low Stock Threshold</TableHead>
@@ -858,7 +861,7 @@ export function ProductsManager({
           {paginatedProducts.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={isAdmin ? 10 : 9}
+                colSpan={isAdmin ? 11 : 10}
                 className="text-muted-foreground"
               >
                 No products found.
@@ -880,6 +883,7 @@ export function ProductsManager({
                   </div>
                 </TableCell>
                 <TableCell>{product.unit ?? "pcs"}</TableCell>
+                <TableCell>{formatProductDate(product.createdAt)}</TableCell>
                 <TableCell>{formatProductDate(product.lastRestockAt)}</TableCell>
                 <TableCell>{product.supplierName || "-"}</TableCell>
                 <TableCell>{product.lowStockThreshold ?? 0}</TableCell>

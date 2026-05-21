@@ -370,6 +370,9 @@ export function InvoicesManager({
               padding: 9px 8px;
               vertical-align: top;
             }
+            tbody tr:nth-child(even) {
+              background: #BFDBFE;
+            }
             td span {
               display: block;
               margin-top: 3px;
@@ -385,7 +388,7 @@ export function InvoicesManager({
               min-width: 260px;
               border: 1.5px solid #000000;
               padding: 16px;
-              background: #eeeeee;
+              background: #BFDBFE;
             }
             .total strong {
               display: flex;
