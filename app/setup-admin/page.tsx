@@ -92,7 +92,7 @@ export default function SetupAdminPage() {
             </div>
           ) : null}
 
-          <form className="space-y-4" onSubmit={handleSetup}>
+          <form className="space-y-4" onSubmit={handleSetup} autoComplete="off">
             <label className="block space-y-2 text-sm font-medium text-foreground">
               Full name
               <div className="relative">
@@ -102,7 +102,7 @@ export default function SetupAdminPage() {
                   placeholder="Admin name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  autoComplete="name"
+                  autoComplete="off"
                   required
                 />
               </div>
@@ -117,7 +117,7 @@ export default function SetupAdminPage() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   type="email"
-                  autoComplete="email"
+                  autoComplete="off"
                   required
                 />
               </div>
@@ -132,7 +132,7 @@ export default function SetupAdminPage() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   type="password"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   required
                   minLength={8}
                 />
@@ -148,7 +148,7 @@ export default function SetupAdminPage() {
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   type="password"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   required
                   minLength={8}
                 />

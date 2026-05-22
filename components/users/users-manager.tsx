@@ -216,6 +216,7 @@ export function UsersManager({
                 Name
                 <Input
                   value={formState.name}
+                  autoComplete="off"
                   onChange={(event) =>
                     setFormState((prev) => ({
                       ...prev,
@@ -229,6 +230,7 @@ export function UsersManager({
                 <Input
                   type="text"
                   value={formState.email}
+                  autoComplete="off"
                   onChange={(event) =>
                     setFormState((prev) => ({
                       ...prev,
@@ -242,6 +244,7 @@ export function UsersManager({
                 <Input
                   type="password"
                   value={formState.password}
+                  autoComplete="off"
                   onChange={(event) =>
                     setFormState((prev) => ({
                       ...prev,

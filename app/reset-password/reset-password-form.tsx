@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useTransition } from "react"
+import { type FormEvent, useState, useTransition } from "react"
 import { KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
   const [isSuccess, setIsSuccess] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const handleReset = () => {
+  const handleReset = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
     setMessage(null)
     setIsSuccess(false)
 
@@ -67,23 +68,25 @@ export function ResetPasswordForm({ token }: { token: string }) {
       ) : null}
 
       {!isSuccess ? (
-        <div className="space-y-3">
+        <form className="space-y-3" autoComplete="off" onSubmit={handleReset}>
           <Input
             placeholder="New password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             type="password"
+            autoComplete="off"
           />
           <Input
             placeholder="Confirm new password"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
             type="password"
+            autoComplete="off"
           />
-          <Button onClick={handleReset} disabled={isPending}>
+          <Button disabled={isPending}>
             Reset password
           </Button>
-        </div>
+        </form>
       ) : (
         <Button asChild>
           <Link href="/">Back to sign in</Link>
