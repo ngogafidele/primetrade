@@ -592,17 +592,6 @@ export default async function ReportsPage({
   const totals = sumReports(reports)
   const fromLabel = formatDateOnly(range.from)
   const toLabel = formatDateOnly(range.to)
-  const printableRecentSales = recentSales.map((sale) => ({
-    _id: sale._id.toString(),
-    createdAt: (sale.approvedAt ?? sale.createdAt)?.toISOString(),
-    totalAmount: sale.totalAmount,
-    items: sale.items.map((item) => ({
-      name: item.name,
-      sku: item.sku,
-      unit: item.unit,
-      quantity: item.quantity,
-    })),
-  }))
 
   const cards = [
     { label: "Total Revenue", value: formatCurrency(totals.revenue) },
@@ -661,11 +650,8 @@ export default async function ReportsPage({
         </div>
         <div className="flex items-end">
           <ReportPrintButton
-            fromLabel={fromLabel}
-            toLabel={toLabel}
-            reports={reports}
-            topMovingProducts={netTopMovingProducts}
-            recentSales={printableRecentSales}
+            fromInput={range.fromInput}
+            toInput={range.toInput}
           />
         </div>
       </form>
