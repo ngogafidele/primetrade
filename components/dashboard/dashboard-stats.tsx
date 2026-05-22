@@ -84,6 +84,13 @@ export function DashboardStats() {
     return <p className="text-sm text-muted-foreground">No stats available.</p>
   }
 
+  const profitToday =
+    stats.grossProfitToday - stats.expensesToday + stats.returnCostToday
+  const cardClass =
+    "rounded-2xl border border-border/80 bg-[#BFDBFE] p-4 text-black shadow-sm"
+  const warningCardClass =
+    "rounded-2xl border border-border/80 bg-[#FEF3C7] p-4 text-black shadow-sm"
+
   const cards = [
     { label: "Products", value: stats.productCount, icon: Boxes },
     {
@@ -106,13 +113,13 @@ export function DashboardStats() {
       label: "Expenses Today",
       value: formatCurrency(stats.expensesToday),
       icon: Scale,
+      warning: stats.expensesToday > 0,
     },
     {
       label: "Profit Today",
-      value: formatCurrency(
-        stats.grossProfitToday - stats.expensesToday + stats.returnCostToday
-      ),
+      value: formatCurrency(profitToday),
       icon: TrendingUp,
+      warning: profitToday < 0,
     },
   ]
 
@@ -122,15 +129,15 @@ export function DashboardStats() {
         {cards.map((card) => (
           <div
             key={card.label}
-            className="rounded-2xl border border-border/80 bg-background/80 p-4 shadow-sm"
+            className={card.warning ? warningCardClass : cardClass}
           >
             <div className="flex items-center justify-between">
-              <p className="max-w-36 text-xs uppercase leading-4 tracking-[0.12em] text-muted-foreground">
+              <p className="max-w-36 text-xs uppercase leading-4 tracking-[0.12em] text-black/70">
                 {card.label}
               </p>
-              <card.icon className="size-4 text-primary" />
+              <card.icon className="size-4 text-black/70" />
             </div>
-            <p className="mt-2 text-2xl font-semibold text-foreground">
+            <p className="mt-2 text-2xl font-semibold text-black">
               {card.value}
             </p>
           </div>

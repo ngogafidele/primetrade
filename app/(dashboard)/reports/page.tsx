@@ -593,15 +593,25 @@ export default async function ReportsPage({
   const fromLabel = formatDateOnly(range.from)
   const toLabel = formatDateOnly(range.to)
 
+  const reportCardClass =
+    "rounded-2xl border border-border/80 bg-[#BFDBFE] p-4 text-black shadow-sm"
+  const reportWarningCardClass =
+    "rounded-2xl border border-border/80 bg-[#FEF3C7] p-4 text-black shadow-sm"
+
   const cards = [
     { label: "Total Revenue", value: formatCurrency(totals.revenue) },
     { label: "Cost of Sales", value: formatCurrency(totals.costOfSales) },
-    { label: "Expenses", value: formatCurrency(totals.expenses) },
+    {
+      label: "Expenses",
+      value: formatCurrency(totals.expenses),
+      warning: totals.expenses > 0,
+    },
     {
       label: "Profit",
       value: formatCurrency(
         totals.grossProfit - totals.expenses + totals.returnCostImpact
       ),
+      warning: totals.grossProfit - totals.expenses + totals.returnCostImpact < 0,
     },
     { label: "Inventory Cost", value: formatCurrency(totals.inventoryCost) },
     { label: "Inventory Retail", value: formatCurrency(totals.inventoryRetail) },
@@ -610,6 +620,7 @@ export default async function ReportsPage({
     {
       label: "Loan Sales",
       value: formatCurrency(totals.outstandingSales),
+      warning: totals.outstandingSales > 0,
     },
   ]
 
@@ -660,12 +671,12 @@ export default async function ReportsPage({
         {cards.map((card) => (
           <div
             key={card.label}
-            className="rounded-2xl border border-border/80 bg-background/80 p-4 shadow-sm"
+            className={card.warning ? reportWarningCardClass : reportCardClass}
           >
-            <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            <p className="text-xs uppercase tracking-[0.16em] text-black/70">
               {card.label}
             </p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">
+            <p className="mt-2 text-2xl font-semibold text-black">
               {card.value}
             </p>
           </div>
@@ -683,12 +694,12 @@ export default async function ReportsPage({
           {paymentCards.map((card) => (
             <div
               key={card.label}
-              className="rounded-2xl border border-border/80 bg-background/80 p-4 shadow-sm"
+              className={reportCardClass}
             >
-              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="text-xs uppercase tracking-[0.16em] text-black/70">
                 {card.label}
               </p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">
+              <p className="mt-2 text-2xl font-semibold text-black">
                 {card.value}
               </p>
             </div>
