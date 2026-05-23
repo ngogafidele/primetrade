@@ -40,6 +40,7 @@ export default async function InvoicesPage() {
       canCreateInvoices={true}
       canManageInvoices={session.isAdmin || session.role === "manager"}
       canDeleteInvoices={session.isAdmin}
+      canApproveProformas={session.isAdmin}
     />
   )
 }

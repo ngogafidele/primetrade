@@ -34,6 +34,16 @@ export async function GET(
       )
     }
 
+    if ((proforma.approvalStatus ?? "approved") !== "approved") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This proforma must be approved before its PDF can be downloaded",
+        },
+        { status: 409 }
+      )
+    }
+
     const processedBy =
       typeof proforma.createdBy === "object" && proforma.createdBy !== null
         ? proforma.createdBy.name ?? proforma.createdBy.email

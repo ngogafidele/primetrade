@@ -133,6 +133,9 @@ export async function POST(request: NextRequest) {
       }
     })
     const totalAmount = items.reduce((sum, item) => sum + item.lineTotal, 0)
+    const shouldApproveImmediately = session.isAdmin
+    const approvalStatus = shouldApproveImmediately ? "approved" : "pending"
+    const approvedAt = shouldApproveImmediately ? new Date() : undefined
 
     let proforma = null
     for (let attempt = 0; attempt < MAX_PROFORMA_NUMBER_ATTEMPTS; attempt += 1) {
@@ -145,6 +148,9 @@ export async function POST(request: NextRequest) {
           customerPhone: payload.customerPhone ?? "",
           notes: payload.notes ?? "",
           createdBy: session.userId,
+          approvalStatus,
+          approvedBy: shouldApproveImmediately ? session.userId : undefined,
+          approvedAt,
           items,
           totalAmount,
           issuedAt: new Date(),

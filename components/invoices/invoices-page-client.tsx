@@ -13,11 +13,13 @@ export function InvoicesPageClient({
   canCreateInvoices,
   canManageInvoices,
   canDeleteInvoices,
+  canApproveProformas,
   sales,
 }: {
   canCreateInvoices: boolean
   canManageInvoices: boolean
   canDeleteInvoices: boolean
+  canApproveProformas: boolean
   sales: SaleInvoiceSaleOption[]
 }) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("sales")
@@ -87,6 +89,7 @@ export function InvoicesPageClient({
           canCreateInvoices={canCreateInvoices}
           canManageInvoices={canManageInvoices}
           canDeleteInvoices={canDeleteInvoices}
+          canApproveProformas={canApproveProformas}
           newInvoiceSignal={newProformaSignal}
         />
       )}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
+  CheckCircle2,
   Download,
   Eye,
   Pencil,
@@ -39,6 +40,7 @@ type ProformaInvoice = {
   notes?: string
   totalAmount: number
   issuedAt?: string
+  approvalStatus?: "pending" | "approved"
   items: Array<{
     description: string
     unit?: string
@@ -105,11 +107,13 @@ export function ProformaInvoicesList({
   canCreateInvoices,
   canManageInvoices,
   canDeleteInvoices,
+  canApproveProformas,
   newInvoiceSignal,
 }: {
   canCreateInvoices: boolean
   canManageInvoices: boolean
   canDeleteInvoices: boolean
+  canApproveProformas: boolean
   newInvoiceSignal: number
 }) {
   const [proformas, setProformas] = useState<ProformaInvoice[]>([])
@@ -133,6 +137,7 @@ export function ProformaInvoicesList({
           body.data.map((proforma: ProformaInvoice) => ({
             ...proforma,
             _id: proforma._id.toString(),
+            approvalStatus: proforma.approvalStatus ?? "approved",
           }))
         )
       }
@@ -290,6 +295,7 @@ export function ProformaInvoicesList({
       const savedProforma = {
         ...body.data,
         _id: body.data._id.toString(),
+        approvalStatus: body.data.approvalStatus ?? "approved",
       } as ProformaInvoice
 
       setProformas((current) =>
@@ -339,6 +345,42 @@ export function ProformaInvoicesList({
       URL.revokeObjectURL(url)
     } catch {
       setError("Failed to download proforma PDF.")
+    }
+  }
+
+  const approveProforma = async (proforma: ProformaInvoice) => {
+    setSubmitting(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/proformas/${proforma._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvalStatus: "approved" }),
+      })
+      const body = await response.json().catch(() => null)
+
+      if (!response.ok || !body?.success) {
+        setError(body?.error ?? "Failed to approve proforma.")
+        return
+      }
+
+      const approved = {
+        ...body.data,
+        _id: body.data._id.toString(),
+        approvalStatus: "approved",
+      } as ProformaInvoice
+
+      setProformas((current) =>
+        current.map((item) => (item._id === approved._id ? approved : item))
+      )
+      if (detailProforma?._id === approved._id) {
+        setDetailProforma(approved)
+      }
+    } catch {
+      setError("Failed to approve proforma.")
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -399,13 +441,14 @@ export function ProformaInvoicesList({
               <TableHead>Date</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {visibleProformas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={6} className="text-muted-foreground">
                   No proforma invoices found.
                 </TableCell>
               </TableRow>
@@ -418,6 +461,17 @@ export function ProformaInvoicesList({
                   <TableCell>{formatDate(proforma.issuedAt)}</TableCell>
                   <TableCell>{proforma.customerName}</TableCell>
                   <TableCell>{formatCurrency(proforma.totalAmount)}</TableCell>
+                  <TableCell>
+                    {(proforma.approvalStatus ?? "approved") === "pending" ? (
+                      <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
+                        Pending approval
+                      </span>
+                    ) : (
+                      <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
+                        Approved
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex flex-wrap justify-end gap-2">
                       <Button
@@ -432,9 +486,24 @@ export function ProformaInvoicesList({
                         size="sm"
                         variant="outline"
                         onClick={() => downloadPdf(proforma)}
+                        disabled={
+                          submitting ||
+                          (proforma.approvalStatus ?? "approved") === "pending"
+                        }
                       >
                         <Download className="size-4" />
                       </Button>
+                      {canApproveProformas &&
+                      (proforma.approvalStatus ?? "approved") === "pending" ? (
+                        <Button
+                          size="sm"
+                          onClick={() => approveProforma(proforma)}
+                          disabled={submitting}
+                        >
+                          <CheckCircle2 className="size-4" />
+                          Approve
+                        </Button>
+                      ) : null}
                       {canManageInvoices ? (
                         <Button
                           size="sm"
@@ -650,6 +719,9 @@ export function ProformaInvoicesList({
               <p>Customer: {detailProforma.customerName}</p>
               <p>Date: {formatDate(detailProforma.issuedAt)}</p>
               <p>Amount: {formatCurrency(detailProforma.totalAmount)}</p>
+              <p className="capitalize">
+                Status: {detailProforma.approvalStatus ?? "approved"}
+              </p>
               {detailProforma.notes ? <p>Note: {detailProforma.notes}</p> : null}
               <div className="rounded-lg border border-border p-3">
                 {detailProforma.items.map((item, index) => (
