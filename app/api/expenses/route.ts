@@ -37,6 +37,9 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = CreateExpenseSchema.parse(await request.json())
+    const shouldApproveImmediately = session.isAdmin
+    const approvalStatus = shouldApproveImmediately ? "approved" : "pending"
+    const approvedAt = shouldApproveImmediately ? new Date() : undefined
 
     await connectToDatabase()
 
@@ -48,6 +51,9 @@ export async function POST(request: NextRequest) {
       notes: payload.notes?.trim() ?? "",
       incurredAt: payload.incurredAt ? new Date(payload.incurredAt) : undefined,
       createdBy: session.userId,
+      approvalStatus,
+      approvedBy: shouldApproveImmediately ? session.userId : undefined,
+      approvedAt,
     })
 
     return NextResponse.json({ success: true, data: expense }, { status: 201 })

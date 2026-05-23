@@ -6,6 +6,7 @@ import { ReturnTransaction } from "@/lib/db/models/Return"
 import { Sale } from "@/lib/db/models/Sale"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Expense } from "@/lib/db/models/Expense"
+import { approvedExpenseDateFilter } from "@/lib/db/expense-approval"
 import {
   approvedSaleDateFilter,
   approvedSaleFilter,
@@ -222,13 +223,7 @@ export async function GET(request: NextRequest) {
 
     const todayExpenses = await Expense.aggregate<DashboardMoneyTotal>([
       {
-        $match: {
-          $or: [
-            { incurredAt: { $gte: today.start, $lt: today.end } },
-            { incurredAt: { $exists: false }, createdAt: todayDateRange },
-            { incurredAt: null, createdAt: todayDateRange },
-          ],
-        },
+        $match: approvedExpenseDateFilter(todayDateRange),
       },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ])

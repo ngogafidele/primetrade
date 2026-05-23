@@ -11,8 +11,14 @@ type InvoicePageSale = {
   totalAmount: number
 }
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string | string[] }>
+}) {
   const session = await requireServerSession()
+  const params = await searchParams
+  const requestedTab = Array.isArray(params.tab) ? params.tab[0] : params.tab
 
   await connectToDatabase()
   const sales = await Sale.find(approvedSaleFilter)
@@ -36,6 +42,8 @@ export default async function InvoicesPage() {
 
   return (
     <InvoicesPageClient
+      key={requestedTab === "proforma" ? "proforma" : "sales"}
+      initialTab={requestedTab === "proforma" ? "proforma" : "sales"}
       sales={serializedSales}
       canCreateInvoices={true}
       canManageInvoices={session.isAdmin || session.role === "manager"}

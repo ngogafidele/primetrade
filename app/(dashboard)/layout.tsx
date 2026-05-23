@@ -3,6 +3,8 @@ import { AppShell } from "@/components/layout/app-shell"
 import type { HeaderNotifications } from "@/components/layout/header-notifications"
 import { requireServerSession } from "@/lib/auth/server"
 import { connectToDatabase } from "@/lib/db/connection"
+import { Expense } from "@/lib/db/models/Expense"
+import { Proforma } from "@/lib/db/models/Proforma"
 import { Sale } from "@/lib/db/models/Sale"
 import { User } from "@/lib/db/models/User"
 import { approvedSaleFilter } from "@/lib/db/sales-approval"
@@ -15,6 +17,21 @@ type DashboardLayoutUser = {
 type PendingSaleNotification = {
   _id: { toString(): string }
   totalAmount: number
+  createdAt?: Date
+}
+
+type PendingProformaNotification = {
+  _id: { toString(): string }
+  proformaNumber: string
+  customerName: string
+  totalAmount: number
+  createdAt?: Date
+}
+
+type PendingExpenseNotification = {
+  _id: { toString(): string }
+  title: string
+  amount: number
   createdAt?: Date
 }
 
@@ -39,16 +56,25 @@ async function getHeaderNotifications(): Promise<HeaderNotifications> {
   await connectToDatabase()
 
   const today = getKigaliDateNumber(new Date())
-  const [pendingSales, loanSales] = await Promise.all([
-    Sale.find({ approvalStatus: "pending" })
-      .select("totalAmount createdAt")
-      .sort({ createdAt: -1 })
-      .lean<PendingSaleNotification[]>(),
-    Sale.find({ ...approvedSaleFilter, paymentStatus: "unpaid" })
-      .select("totalAmount outstanding")
-      .sort({ "outstanding.paymentDate": 1, createdAt: -1 })
-      .lean<LoanNotification[]>(),
-  ])
+  const [pendingSales, pendingProformas, pendingExpenses, loanSales] =
+    await Promise.all([
+      Sale.find({ approvalStatus: "pending" })
+        .select("totalAmount createdAt")
+        .sort({ createdAt: -1 })
+        .lean<PendingSaleNotification[]>(),
+      Proforma.find({ approvalStatus: "pending" })
+        .select("proformaNumber customerName totalAmount createdAt")
+        .sort({ createdAt: -1 })
+        .lean<PendingProformaNotification[]>(),
+      Expense.find({ approvalStatus: "pending" })
+        .select("title amount createdAt")
+        .sort({ createdAt: -1 })
+        .lean<PendingExpenseNotification[]>(),
+      Sale.find({ ...approvedSaleFilter, paymentStatus: "unpaid" })
+        .select("totalAmount outstanding")
+        .sort({ "outstanding.paymentDate": 1, createdAt: -1 })
+        .lean<LoanNotification[]>(),
+    ])
 
   const loans = loanSales.map((sale) => ({
     _id: sale._id.toString(),
@@ -69,6 +95,31 @@ async function getHeaderNotifications(): Promise<HeaderNotifications> {
       _id: sale._id.toString(),
       totalAmount: sale.totalAmount,
       createdAtLabel: formatInKigali(sale.createdAt, {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    })),
+    pendingProformas: pendingProformas.map((proforma) => ({
+      _id: proforma._id.toString(),
+      number: proforma.proformaNumber,
+      customerName: proforma.customerName,
+      totalAmount: proforma.totalAmount,
+      createdAtLabel: formatInKigali(proforma.createdAt, {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    })),
+    pendingExpenses: pendingExpenses.map((expense) => ({
+      _id: expense._id.toString(),
+      title: expense.title,
+      amount: expense.amount,
+      createdAtLabel: formatInKigali(expense.createdAt, {
         year: "numeric",
         month: "short",
         day: "2-digit",

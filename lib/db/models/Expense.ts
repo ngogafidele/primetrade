@@ -9,6 +9,14 @@ const ExpenseSchema = new Schema(
     notes: { type: String, trim: true, default: "" },
     incurredAt: { type: Date },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved"],
+      required: true,
+      default: "approved",
+    },
+    approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    approvedAt: { type: Date },
   },
   { timestamps: true }
 )

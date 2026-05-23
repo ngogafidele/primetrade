@@ -20,6 +20,7 @@ type ExpensePageEntry = {
   incurredAt?: Date
   createdAt?: Date
   updatedAt?: Date
+  approvalStatus?: "pending" | "approved"
   createdBy?: PopulatedExpenseUser | { toString(): string }
 }
 
@@ -43,6 +44,7 @@ export default async function ExpensesPage() {
     _id: expense._id.toString(),
     createdAt: expense.createdAt?.toISOString(),
     incurredAt: expense.incurredAt?.toISOString(),
+    approvalStatus: expense.approvalStatus ?? "approved",
     createdBy: isPopulatedExpenseUser(expense.createdBy)
       ? expense.createdBy._id.toString()
       : expense.createdBy?.toString(),
@@ -55,6 +57,7 @@ export default async function ExpensesPage() {
     <ExpensesManager
       initialExpenses={serializedExpenses}
       currentUserLabel={session.email}
+      canApproveExpenses={session.isAdmin}
     />
   )
 }

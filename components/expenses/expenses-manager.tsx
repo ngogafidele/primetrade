@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { CheckCircle2 } from "lucide-react"
 import { formatCurrency } from "@/lib/utils/format"
 import {
   formatInKigali,
@@ -29,6 +30,7 @@ type ExpenseClient = {
   incurredAt?: string
   createdAt?: string
   createdByName?: string
+  approvalStatus?: "pending" | "approved"
 }
 
 type FormState = {
@@ -52,9 +54,11 @@ const emptyForm: FormState = {
 export function ExpensesManager({
   initialExpenses,
   currentUserLabel,
+  canApproveExpenses,
 }: {
   initialExpenses: ExpenseClient[]
   currentUserLabel: string
+  canApproveExpenses: boolean
 }) {
   const [expenses, setExpenses] = useState(initialExpenses)
   const [formState, setFormState] = useState<FormState>(emptyForm)
@@ -125,6 +129,7 @@ export function ExpensesManager({
       setExpenses((current) => [
         {
           ...created,
+          approvalStatus: created.approvalStatus ?? "approved",
           createdByName: currentUserLabel,
         },
         ...current,
@@ -133,6 +138,37 @@ export function ExpensesManager({
       resetForm()
     } catch {
       setError("Failed to record expense.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const approveExpense = async (expense: ExpenseClient) => {
+    setSubmitting(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/expenses/${expense._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvalStatus: "approved" }),
+      })
+      const body = await response.json().catch(() => null)
+
+      if (!response.ok || !body?.success) {
+        setError(body?.error ?? "Failed to approve expense.")
+        return
+      }
+
+      setExpenses((current) =>
+        current.map((item) =>
+          item._id === expense._id
+            ? { ...item, ...body.data, approvalStatus: "approved" }
+            : item
+        )
+      )
+    } catch {
+      setError("Failed to approve expense.")
     } finally {
       setSubmitting(false)
     }
@@ -244,12 +280,19 @@ export function ExpensesManager({
             <TableHead>Vendor</TableHead>
             <TableHead>Amount</TableHead>
             <TableHead>Logged By</TableHead>
+            <TableHead>Status</TableHead>
+            {canApproveExpenses ? (
+              <TableHead className="text-right">Actions</TableHead>
+            ) : null}
           </TableRow>
         </TableHeader>
         <TableBody>
           {paginatedExpenses.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-muted-foreground">
+              <TableCell
+                colSpan={canApproveExpenses ? 8 : 7}
+                className="text-muted-foreground"
+              >
                 No expenses recorded yet.
               </TableCell>
             </TableRow>
@@ -273,6 +316,31 @@ export function ExpensesManager({
                 <TableCell>{expense.vendor || "-"}</TableCell>
                 <TableCell>{formatCurrency(expense.amount)}</TableCell>
                 <TableCell>{expense.createdByName ?? "Unknown User"}</TableCell>
+                <TableCell>
+                  {(expense.approvalStatus ?? "approved") === "pending" ? (
+                    <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
+                      Pending approval
+                    </span>
+                  ) : (
+                    <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
+                      Approved
+                    </span>
+                  )}
+                </TableCell>
+                {canApproveExpenses ? (
+                  <TableCell className="text-right">
+                    {(expense.approvalStatus ?? "approved") === "pending" ? (
+                      <Button
+                        size="sm"
+                        onClick={() => approveExpense(expense)}
+                        disabled={submitting}
+                      >
+                        <CheckCircle2 className="size-4" />
+                        Approve
+                      </Button>
+                    ) : null}
+                  </TableCell>
+                ) : null}
               </TableRow>
             ))
           )}

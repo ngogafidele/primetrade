@@ -3,7 +3,15 @@
 import type { ReactNode } from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, Bell, CheckCircle2, Clock, X } from "lucide-react"
+import {
+  AlertTriangle,
+  Bell,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Wallet,
+  X,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/utils/format"
 
@@ -21,8 +29,25 @@ export type HeaderNotificationLoan = {
   totalAmount: number
 }
 
+export type HeaderNotificationProforma = {
+  _id: string
+  number: string
+  customerName: string
+  totalAmount: number
+  createdAtLabel: string
+}
+
+export type HeaderNotificationExpense = {
+  _id: string
+  title: string
+  amount: number
+  createdAtLabel: string
+}
+
 export type HeaderNotifications = {
   pendingSales: HeaderNotificationSale[]
+  pendingProformas: HeaderNotificationProforma[]
+  pendingExpenses: HeaderNotificationExpense[]
   dueLoans: HeaderNotificationLoan[]
   overdueLoans: HeaderNotificationLoan[]
 }
@@ -37,6 +62,8 @@ export function HeaderNotificationsButton({
   const totalCount = useMemo(
     () =>
       notifications.pendingSales.length +
+      notifications.pendingProformas.length +
+      notifications.pendingExpenses.length +
       notifications.dueLoans.length +
       notifications.overdueLoans.length,
     [notifications]
@@ -133,6 +160,41 @@ export function HeaderNotificationsButton({
                     <span>{formatCurrency(sale.totalAmount)}</span>
                     <span className="text-muted-foreground">
                       {sale.createdAtLabel}
+                    </span>
+                  </>
+                )}
+              />
+
+              <NotificationGroup
+                href="/invoices?tab=proforma"
+                icon={<FileText className="size-4 text-primary" />}
+                items={notifications.pendingProformas}
+                label="Proformas to approve"
+                onNavigate={() => setOpen(false)}
+                renderItem={(proforma) => (
+                  <>
+                    <span>
+                      {proforma.number} - {proforma.customerName}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {formatCurrency(proforma.totalAmount)} -{" "}
+                      {proforma.createdAtLabel}
+                    </span>
+                  </>
+                )}
+              />
+
+              <NotificationGroup
+                href="/expenses"
+                icon={<Wallet className="size-4 text-primary" />}
+                items={notifications.pendingExpenses}
+                label="Expenses to approve"
+                onNavigate={() => setOpen(false)}
+                renderItem={(expense) => (
+                  <>
+                    <span>{expense.title}</span>
+                    <span className="text-muted-foreground">
+                      {formatCurrency(expense.amount)} - {expense.createdAtLabel}
                     </span>
                   </>
                 )}

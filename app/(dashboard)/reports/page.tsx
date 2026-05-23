@@ -3,6 +3,7 @@ import { connection } from "next/server"
 import { requireServerSession } from "@/lib/auth/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Expense } from "@/lib/db/models/Expense"
+import { approvedExpenseDateFilter } from "@/lib/db/expense-approval"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Product } from "@/lib/db/models/Product"
 import { ReturnTransaction } from "@/lib/db/models/Return"
@@ -346,13 +347,7 @@ export default async function ReportsPage({
     ]),
     Expense.aggregate<ExpenseTotals>([
       {
-        $match: {
-          $or: [
-            { incurredAt: periodFilter },
-            { incurredAt: { $exists: false }, createdAt: periodFilter },
-            { incurredAt: null, createdAt: periodFilter },
-          ],
-        },
+        $match: approvedExpenseDateFilter(periodFilter),
       },
       {
         $group: {

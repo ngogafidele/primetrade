@@ -10,19 +10,21 @@ import { SalesInvoicesList, type SaleInvoiceSaleOption } from "@/components/invo
 type ActiveTab = "sales" | "proforma"
 
 export function InvoicesPageClient({
+  initialTab = "sales",
   canCreateInvoices,
   canManageInvoices,
   canDeleteInvoices,
   canApproveProformas,
   sales,
 }: {
+  initialTab?: ActiveTab
   canCreateInvoices: boolean
   canManageInvoices: boolean
   canDeleteInvoices: boolean
   canApproveProformas: boolean
   sales: SaleInvoiceSaleOption[]
 }) {
-  const [activeTab, setActiveTab] = useState<ActiveTab>("sales")
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab)
   const [newSalesInvoiceSignal, setNewSalesInvoiceSignal] = useState(0)
   const [newProformaSignal, setNewProformaSignal] = useState(0)
 
