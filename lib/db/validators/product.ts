@@ -23,6 +23,12 @@ export const CreateProductSchema = z
   )
   .strict()
 
+export const CreateProductsSchema = z
+  .object({
+    products: z.array(CreateProductSchema).min(1).max(50),
+  })
+  .strict()
+
 export const UpdateProductSchema = z
   .object({
     name: z.string().trim().min(1).optional(),

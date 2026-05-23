@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
 import { ProductSupply } from "@/lib/db/models/ProductSupply"
+import { Alert } from "@/lib/db/models/Alert"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
-import { CreateProductSchema } from "@/lib/db/validators/product"
+import {
+  CreateProductSchema,
+  CreateProductsSchema,
+} from "@/lib/db/validators/product"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 import {
   duplicateKeyIncludes,
@@ -96,6 +100,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const createdProductIds: string[] = []
+
   try {
     const { authorized, session } = await requireAdmin(request)
     if (!authorized || !session) {
@@ -105,76 +111,120 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const payload = CreateProductSchema.parse(await request.json())
-    const {
-      categoryId: _categoryId,
-      supplierName,
-      suppliedAt: suppliedAtInput,
-      ...productInput
-    } = payload
-    const suppliedAt = suppliedAtInput
-      ? parseKigaliDateInput(suppliedAtInput) ?? new Date(suppliedAtInput)
-      : new Date()
+    const body = await request.json()
+    const isBatchRequest =
+      typeof body === "object" && body !== null && "products" in body
+    const payloads = isBatchRequest
+      ? CreateProductsSchema.parse(body).products
+      : [CreateProductSchema.parse(body)]
+    const normalizedNames = payloads.map((payload) =>
+      payload.name.trim().toLowerCase()
+    )
 
-    if (Number.isNaN(suppliedAt.getTime())) {
+    if (new Set(normalizedNames).size !== normalizedNames.length) {
       return NextResponse.json(
-        { success: false, error: "Invalid supplied date" },
-        { status: 400 }
+        { success: false, error: "Product names must be unique" },
+        { status: 409 }
       )
     }
 
     await connectToDatabase()
 
-    if (await productNameExists(payload.name)) {
+    const duplicateNames = await Promise.all(
+      payloads.map((payload) => productNameExists(payload.name))
+    )
+    if (duplicateNames.some(Boolean)) {
       return NextResponse.json(
         { success: false, error: "A product with this name already exists" },
         { status: 409 }
       )
     }
 
-    const product = await Product.create({
-      ...productInput,
-      sku: await generateProductSku(payload.name),
-    })
+    const results = []
+    for (const payload of payloads) {
+      const {
+        categoryId: _categoryId,
+        supplierName,
+        suppliedAt: suppliedAtInput,
+        ...productInput
+      } = payload
+      const suppliedAt = suppliedAtInput
+        ? parseKigaliDateInput(suppliedAtInput) ?? new Date(suppliedAtInput)
+        : new Date()
 
-    const supply =
-      product.quantity > 0
-        ? await ProductSupply.create({
-            productId: product._id,
-            sku: product.sku,
-            productName: product.name,
-            supplierName,
-            quantity: product.quantity,
-            unitCost: product.costPrice,
-            suppliedAt,
-            recordedBy: session.userId,
-          })
-        : null
+      if (Number.isNaN(suppliedAt.getTime())) {
+        throw new Error("Invalid supplied date")
+      }
 
-    await syncLowStockAlert({
-      productId: product._id.toString(),
-      name: product.name,
-      sku: product.sku,
-      quantity: product.quantity,
-      threshold: product.lowStockThreshold ?? 0,
-    })
+      const product = await Product.create({
+        ...productInput,
+        sku: await generateProductSku(payload.name),
+      })
+      createdProductIds.push(product._id.toString())
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: serializeProduct({
+      const supply =
+        product.quantity > 0
+          ? await ProductSupply.create({
+              productId: product._id,
+              sku: product.sku,
+              productName: product.name,
+              supplierName,
+              quantity: product.quantity,
+              unitCost: product.costPrice,
+              suppliedAt,
+              recordedBy: session.userId,
+            })
+          : null
+
+      await syncLowStockAlert({
+        productId: product._id.toString(),
+        name: product.name,
+        sku: product.sku,
+        quantity: product.quantity,
+        threshold: product.lowStockThreshold ?? 0,
+      })
+
+      results.push({
+        product: serializeProduct({
           ...product.toObject(),
           supplierName: supply?.supplierName,
           lastRestockAt: supply?.suppliedAt,
         }),
         supply: supply ? serializeProductSupply(supply) : null,
-      },
+      })
+    }
+
+    return NextResponse.json(
+      isBatchRequest
+        ? {
+            success: true,
+            data: results.map((result) => result.product),
+            supplies: results.map((result) => result.supply),
+          }
+        : {
+            success: true,
+            data: results[0].product,
+            supply: results[0].supply,
+          },
       { status: 201 }
     )
   } catch (error) {
+    if (createdProductIds.length > 0) {
+      await Promise.all([
+        Product.deleteMany({ _id: { $in: createdProductIds } }),
+        ProductSupply.deleteMany({ productId: { $in: createdProductIds } }),
+        Alert.deleteMany({ productId: { $in: createdProductIds } }),
+      ])
+    }
     if (error instanceof ZodError) {
       return NextResponse.json(
         { success: false, error: error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 }
+      )
+    }
+    if (error instanceof Error && error.message === "Invalid supplied date") {
+      return NextResponse.json(
+        { success: false, error: error.message },
         { status: 400 }
       )
     }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { formatCurrency } from "@/lib/utils/format"
-import { FileText, PackagePlus } from "lucide-react"
+import { FileText, PackagePlus, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -88,6 +88,7 @@ function createEmptySupplyForm(product?: ProductClient | null): SupplyFormState 
 }
 
 const PRODUCTS_PER_PAGE = 20
+const MAX_PRODUCTS_PER_CREATE = 50
 
 function formatProductDate(value: string | undefined) {
   if (!value) return "-"
@@ -106,6 +107,9 @@ export function ProductsManager({
   const [products, setProducts] = useState(initialProducts)
   const [search, setSearch] = useState("")
   const [formState, setFormState] = useState<FormState>(() => createEmptyForm())
+  const [createForms, setCreateForms] = useState<FormState[]>(() => [
+    createEmptyForm(),
+  ])
   const [supplyForm, setSupplyForm] = useState<SupplyFormState>(() =>
     createEmptySupplyForm()
   )
@@ -162,6 +166,7 @@ export function ProductsManager({
 
   const resetForm = () => {
     setFormState(createEmptyForm())
+    setCreateForms([createEmptyForm()])
     setActiveProductId(null)
     setError(null)
   }
@@ -195,7 +200,88 @@ export function ProductsManager({
     setSupplyDialogOpen(true)
   }
 
-  const submitForm = async () => {
+  const updateCreateForm = (
+    index: number,
+    field: keyof FormState,
+    value: string
+  ) => {
+    setCreateForms((current) =>
+      current.map((form, formIndex) =>
+        formIndex === index ? { ...form, [field]: value } : form
+      )
+    )
+  }
+
+  const addCreateForm = () => {
+    setCreateForms((current) =>
+      current.length >= MAX_PRODUCTS_PER_CREATE
+        ? current
+        : [...current, createEmptyForm()]
+    )
+  }
+
+  const removeCreateForm = (index: number) => {
+    setCreateForms((current) =>
+      current.length === 1
+        ? current
+        : current.filter((_, formIndex) => formIndex !== index)
+    )
+  }
+
+  const getCreatePayload = (form: FormState) => ({
+    name: form.name.trim(),
+    unit: form.unit.trim(),
+    quantity: Number(form.quantity || 0),
+    lowStockThreshold: Number(form.lowStockThreshold || 0),
+    costPrice: Number(form.costPrice || 0),
+    price: Number(form.price || 0),
+    supplierName: form.supplierName.trim() || undefined,
+    suppliedAt: form.suppliedAt || undefined,
+  })
+
+  const submitCreateForms = async () => {
+    if (
+      createForms.some(
+        (form) => !form.name.trim() || !form.unit.trim()
+      )
+    ) {
+      setError("Please provide a name and unit for every product.")
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          products: createForms.map(getCreatePayload),
+        }),
+      })
+
+      const body = await response.json()
+      if (!response.ok || !body?.success) {
+        setError(body?.error ?? "Failed to save products.")
+        return
+      }
+
+      const created = body.data as ProductClient[]
+      setProducts((current) => [...created, ...current])
+      setCurrentPage(1)
+      setDialogOpen(false)
+      resetForm()
+    } catch {
+      setError("Failed to save products.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const submitEditForm = async () => {
+    if (!activeProductId) return
+
     const trimmedName = formState.name.trim()
     const trimmedUnit = formState.unit.trim()
 
@@ -214,23 +300,14 @@ export function ProductsManager({
       lowStockThreshold: Number(formState.lowStockThreshold || 0),
       costPrice: Number(formState.costPrice || 0),
       price: Number(formState.price || 0),
-      ...(activeProductId
-        ? {}
-        : {
-            supplierName: formState.supplierName.trim() || undefined,
-            suppliedAt: formState.suppliedAt || undefined,
-          }),
     }
 
     try {
-      const response = await fetch(
-        activeProductId ? `/api/products/${activeProductId}` : "/api/products",
-        {
-          method: activeProductId ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      )
+      const response = await fetch(`/api/products/${activeProductId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
 
       const body = await response.json()
       if (!response.ok || !body?.success) {
@@ -240,14 +317,11 @@ export function ProductsManager({
 
       const updated = body.data as ProductClient
 
-      setProducts((current) => {
-        if (activeProductId) {
-          return current.map((item) =>
-            item._id === activeProductId ? updated : item
-          )
-        }
-        return [updated, ...current]
-      })
+      setProducts((current) =>
+        current.map((item) =>
+          item._id === activeProductId ? updated : item
+        )
+      )
       setCurrentPage(1)
 
       setDialogOpen(false)
@@ -389,145 +463,258 @@ export function ProductsManager({
               <DialogTrigger asChild>
                 <Button onClick={openCreate}>Add Product</Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent
+                className={activeProductId ? undefined : "sm:max-w-5xl"}
+              >
                 <DialogHeader>
                   <DialogTitle>
-                    {activeProductId ? "Edit product" : "Add product"}
+                    {activeProductId ? "Edit product" : "Add products"}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="grid gap-3">
-                  <label className="grid gap-1 text-sm">
-                    Name
-                    <Input
-                      value={formState.name}
-                      onChange={(event) =>
-                        setFormState((prev) => ({
-                          ...prev,
-                          name: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="grid gap-1 text-sm">
-                    Unit
-                    <Input
-                      placeholder="pcs, kg, l, box"
-                      value={formState.unit}
-                      onChange={(event) =>
-                        setFormState((prev) => ({
-                          ...prev,
-                          unit: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                {activeProductId ? (
+                  <div className="grid gap-3">
                     <label className="grid gap-1 text-sm">
-                      Quantity
+                      Name
                       <Input
-                        type="number"
-                        min={0}
-                        placeholder="e.g. 120"
-                        value={formState.quantity}
+                        value={formState.name}
                         onChange={(event) =>
                           setFormState((prev) => ({
                             ...prev,
-                            quantity: event.target.value,
+                            name: event.target.value,
                           }))
                         }
                       />
                     </label>
                     <label className="grid gap-1 text-sm">
-                      Low Stock Threshold (optional)
+                      Unit
                       <Input
-                        type="number"
-                        min={0}
-                        placeholder="Defaults to 0"
-                        value={formState.lowStockThreshold}
+                        placeholder="pcs, kg, l, box"
+                        value={formState.unit}
                         onChange={(event) =>
                           setFormState((prev) => ({
                             ...prev,
-                            lowStockThreshold: event.target.value,
+                            unit: event.target.value,
                           }))
                         }
                       />
                     </label>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-1 text-sm">
-                      Cost Price
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        placeholder="e.g. 850"
-                        value={formState.costPrice}
-                        onChange={(event) =>
-                          setFormState((prev) => ({
-                            ...prev,
-                            costPrice: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                  {!activeProductId ? (
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="grid gap-1 text-sm">
-                        Supplier
+                        Quantity
                         <Input
-                          placeholder="Supplier name"
-                          value={formState.supplierName}
+                          type="number"
+                          min={0}
+                          value={formState.quantity}
                           onChange={(event) =>
                             setFormState((prev) => ({
                               ...prev,
-                              supplierName: event.target.value,
+                              quantity: event.target.value,
                             }))
                           }
                         />
                       </label>
                       <label className="grid gap-1 text-sm">
-                        Supplied Date
+                        Low Stock Threshold
                         <Input
-                          type="date"
-                          value={formState.suppliedAt}
+                          type="number"
+                          min={0}
+                          value={formState.lowStockThreshold}
                           onChange={(event) =>
                             setFormState((prev) => ({
                               ...prev,
-                              suppliedAt: event.target.value,
+                              lowStockThreshold: event.target.value,
                             }))
                           }
                         />
                       </label>
                     </div>
-                  ) : null}
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-1 text-sm">
-                      Selling Price
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        placeholder="e.g. 1000"
-                        value={formState.price}
-                        onChange={(event) =>
-                          setFormState((prev) => ({
-                            ...prev,
-                            price: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="grid gap-1 text-sm">
+                        Cost Price
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={formState.costPrice}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              costPrice: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="grid gap-1 text-sm">
+                        Selling Price
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={formState.price}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              price: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                    {showPriceWarning ? (
+                      <p className="text-sm text-amber-600">
+                        Warning: selling price is lower than the cost price.
+                      </p>
+                    ) : null}
                   </div>
-                  {showPriceWarning ? (
-                    <p className="text-sm text-amber-600">
-                      Warning: selling price is lower than the cost price.
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Enter one or more products, then save them together.
                     </p>
-                  ) : null}
-                  {error ? (
-                    <p className="text-sm text-destructive">{error}</p>
-                  ) : null}
-                </div>
+                    <div className="max-h-[58vh] space-y-3 overflow-y-auto pr-1">
+                      {createForms.map((form, index) => {
+                        const belowCost =
+                          form.costPrice.trim() !== "" &&
+                          form.price.trim() !== "" &&
+                          Number(form.price) < Number(form.costPrice)
+
+                        return (
+                          <section
+                            key={index}
+                            className="rounded-xl border border-border bg-background p-3"
+                          >
+                            <div className="mb-3 flex items-center justify-between">
+                              <h3 className="font-medium">
+                                Product {index + 1}
+                              </h3>
+                              {createForms.length > 1 ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() => removeCreateForm(index)}
+                                  aria-label={`Remove product ${index + 1}`}
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              ) : null}
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                              <label className="grid gap-1 text-sm lg:col-span-2">
+                                Name
+                                <Input
+                                  value={form.name}
+                                  onChange={(event) =>
+                                    updateCreateForm(index, "name", event.target.value)
+                                  }
+                                />
+                              </label>
+                              <label className="grid gap-1 text-sm">
+                                Unit
+                                <Input
+                                  placeholder="pcs, kg, l, box"
+                                  value={form.unit}
+                                  onChange={(event) =>
+                                    updateCreateForm(index, "unit", event.target.value)
+                                  }
+                                />
+                              </label>
+                              <label className="grid gap-1 text-sm">
+                                Quantity
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  value={form.quantity}
+                                  onChange={(event) =>
+                                    updateCreateForm(index, "quantity", event.target.value)
+                                  }
+                                />
+                              </label>
+                              <label className="grid gap-1 text-sm">
+                                Low Stock Threshold
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  placeholder="Defaults to 0"
+                                  value={form.lowStockThreshold}
+                                  onChange={(event) =>
+                                    updateCreateForm(
+                                      index,
+                                      "lowStockThreshold",
+                                      event.target.value
+                                    )
+                                  }
+                                />
+                              </label>
+                              <label className="grid gap-1 text-sm">
+                                Cost Price
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={form.costPrice}
+                                  onChange={(event) =>
+                                    updateCreateForm(index, "costPrice", event.target.value)
+                                  }
+                                />
+                              </label>
+                              <label className="grid gap-1 text-sm">
+                                Selling Price
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={form.price}
+                                  onChange={(event) =>
+                                    updateCreateForm(index, "price", event.target.value)
+                                  }
+                                />
+                              </label>
+                              <label className="grid gap-1 text-sm">
+                                Supplier
+                                <Input
+                                  placeholder="Required when quantity is above 0"
+                                  value={form.supplierName}
+                                  onChange={(event) =>
+                                    updateCreateForm(index, "supplierName", event.target.value)
+                                  }
+                                />
+                              </label>
+                              <label className="grid gap-1 text-sm">
+                                Supplied Date
+                                <Input
+                                  type="date"
+                                  value={form.suppliedAt}
+                                  onChange={(event) =>
+                                    updateCreateForm(index, "suppliedAt", event.target.value)
+                                  }
+                                />
+                              </label>
+                            </div>
+                            {belowCost ? (
+                              <p className="mt-2 text-sm text-amber-600">
+                                Warning: selling price is lower than the cost price.
+                              </p>
+                            ) : null}
+                          </section>
+                        )
+                      })}
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={addCreateForm}
+                        disabled={createForms.length >= MAX_PRODUCTS_PER_CREATE}
+                      >
+                        <Plus className="size-4" />
+                        Add another
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {error ? (
+                  <p className="text-sm text-destructive">{error}</p>
+                ) : null}
                 <DialogFooter>
                   <Button
                     variant="outline"
@@ -535,12 +722,17 @@ export function ProductsManager({
                   >
                     Cancel
                   </Button>
-                  <Button onClick={submitForm} disabled={submitting}>
+                  <Button
+                    onClick={activeProductId ? submitEditForm : submitCreateForms}
+                    disabled={submitting}
+                  >
                     {submitting
                       ? "Saving..."
                       : activeProductId
                       ? "Save changes"
-                      : "Create product"}
+                      : `Save ${createForms.length} product${
+                          createForms.length === 1 ? "" : "s"
+                        }`}
                   </Button>
                 </DialogFooter>
               </DialogContent>
