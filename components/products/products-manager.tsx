@@ -703,6 +703,7 @@ export function ProductsManager({
                       <Button
                         variant="outline"
                         size="sm"
+                        className="border-emerald-500 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-500/60 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25 dark:hover:text-emerald-200"
                         onClick={addCreateForm}
                         disabled={createForms.length >= MAX_PRODUCTS_PER_CREATE}
                       >
