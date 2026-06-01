@@ -3,7 +3,15 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowRight, KeyRound, LockKeyhole, Mail, PackageCheck } from "lucide-react"
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  KeyRound,
+  LockKeyhole,
+  Mail,
+  PackageCheck,
+} from "lucide-react"
 import { type FormEvent, useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +20,7 @@ export default function Home() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -125,14 +134,28 @@ export default function Home() {
               <div className="relative">
                 <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  className="h-11 pl-9"
+                  className="h-11 pl-9 pr-11"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="off"
                   required
                 />
+                <Button
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-1 top-1/2 size-9 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword((current) => !current)}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                >
+                  {showPassword ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </Button>
               </div>
             </label>
 

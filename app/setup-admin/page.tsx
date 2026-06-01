@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   CheckCircle2,
+  Eye,
+  EyeOff,
   LockKeyhole,
   Mail,
   ShieldCheck,
@@ -21,6 +23,8 @@ export default function SetupAdminPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -127,15 +131,29 @@ export default function SetupAdminPage() {
               <div className="relative">
                 <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  className="h-11 pl-9"
+                  className="h-11 pl-9 pr-11"
                   placeholder="Minimum 8 characters"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="off"
                   required
                   minLength={8}
                 />
+                <Button
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-1 top-1/2 size-9 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword((current) => !current)}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                >
+                  {showPassword ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </Button>
               </div>
             </label>
             <label className="block space-y-2 text-sm font-medium text-foreground">
@@ -143,15 +161,33 @@ export default function SetupAdminPage() {
               <div className="relative">
                 <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  className="h-11 pl-9"
+                  className="h-11 pl-9 pr-11"
                   placeholder="Repeat password"
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"}
                   autoComplete="off"
                   required
                   minLength={8}
                 />
+                <Button
+                  aria-label={
+                    showConfirmPassword
+                      ? "Hide confirm password"
+                      : "Show confirm password"
+                  }
+                  className="absolute right-1 top-1/2 size-9 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowConfirmPassword((current) => !current)}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </Button>
               </div>
             </label>
 
