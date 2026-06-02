@@ -72,6 +72,7 @@ type ReturnProductImpact = ReportPdfTopMovingProduct
 
 type RecentSale = {
   _id: { toString(): string }
+  saleDate?: Date
   createdAt?: Date
   approvedAt?: Date
   totalAmount: number
@@ -405,8 +406,8 @@ export async function GET(request: NextRequest) {
         },
       ]),
       Sale.find(approvedPeriodFilter)
-        .select("items totalAmount createdAt approvedAt")
-        .sort({ createdAt: -1 })
+        .select("items totalAmount saleDate createdAt approvedAt")
+        .sort({ saleDate: -1, createdAt: -1 })
         .limit(8)
         .lean<RecentSale[]>(),
     ])
@@ -481,7 +482,7 @@ export async function GET(request: NextRequest) {
         topMovingProducts: netTopMovingProducts,
         recentSales: recentSales.map((sale) => ({
           _id: sale._id.toString(),
-          createdAt: sale.approvedAt ?? sale.createdAt,
+          createdAt: sale.saleDate ?? sale.createdAt,
           totalAmount: sale.totalAmount,
           items: sale.items.map((item) => ({
             name: item.name,

@@ -115,6 +115,7 @@ type ReturnProductImpact = TopMovingProduct
 
 type RecentSale = {
   _id: string
+  saleDate?: Date
   createdAt?: Date
   approvedAt?: Date
   totalAmount: number
@@ -518,8 +519,8 @@ export default async function ReportsPage({
       },
     ]),
     Sale.find(approvedPeriodFilter)
-      .select("items totalAmount createdAt approvedAt")
-      .sort({ createdAt: -1 })
+      .select("items totalAmount saleDate createdAt approvedAt")
+      .sort({ saleDate: -1, createdAt: -1 })
       .limit(8)
       .lean<RecentSale[]>(),
   ])
@@ -821,7 +822,7 @@ export default async function ReportsPage({
                 recentSales.map((sale) => (
                   <TableRow key={sale._id.toString()}>
                     <TableCell>
-                      {formatDateTime(sale.approvedAt ?? sale.createdAt)}
+                      {formatDateTime(sale.saleDate ?? sale.createdAt)}
                     </TableCell>
                     <TableCell>
                       <span className="whitespace-normal wrap-break-word">

@@ -21,6 +21,7 @@ type LoanSaleItem = {
 
 type LoanSale = {
   _id: { toString(): string }
+  saleDate?: Date
   createdAt?: Date
   createdBy?: PopulatedSaleUser | { toString(): string }
   totalAmount: number
@@ -79,7 +80,7 @@ export default async function LoansPage() {
 
     return {
       _id: sale._id.toString(),
-      createdAtLabel: formatInKigali(sale.createdAt, {
+      createdAtLabel: formatInKigali(sale.saleDate ?? sale.createdAt, {
         year: "numeric",
         month: "short",
         day: "2-digit",

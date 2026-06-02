@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Product } from "@/lib/db/models/Product"
+import { Proforma } from "@/lib/db/models/Proforma"
 import { Sale } from "@/lib/db/models/Sale"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 import { approvedSaleFilter } from "@/lib/db/sales-approval"
 import { CreateSaleSchema } from "@/lib/db/validators/sale"
+import { parseKigaliDateInput } from "@/lib/utils/time"
 
 type SaleItemForRestock = {
   productId: { toString(): string }
@@ -228,6 +230,17 @@ export async function PATCH(
               customerPhone: updatePayload.customer.customerPhone?.trim() ?? "",
             }
           : undefined
+      const saleDate = updatePayload.saleDate
+        ? parseKigaliDateInput(updatePayload.saleDate) ??
+          new Date(updatePayload.saleDate)
+        : sale.saleDate ?? sale.createdAt ?? new Date()
+
+      if (Number.isNaN(saleDate.getTime())) {
+        return NextResponse.json(
+          { success: false, error: "Sale date is invalid" },
+          { status: 400 }
+        )
+      }
 
       const touchedProductIds = Array.from(netStockChanges.keys())
       const touchedProducts =
@@ -283,6 +296,7 @@ export async function PATCH(
               ? updatePayload.paymentMethod
               : undefined,
           notes: updatePayload.notes ?? "",
+          saleDate,
           customer,
           outstanding,
         })
@@ -548,18 +562,6 @@ export async function DELETE(
       )
     }
 
-    const invoice = await Invoice.findOne({ saleId: sale._id })
-    if (invoice) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Cannot delete a sale that already has an invoice. Delete the invoice first.",
-        },
-        { status: 409 }
-      )
-    }
-
     const shouldRestock = (sale.approvalStatus ?? "approved") === "approved"
     const saleItems = sale.items as SaleItemForRestock[]
     const productIds = shouldRestock
@@ -583,7 +585,26 @@ export async function DELETE(
       )
     }
 
+    const proformasToRestore = await Proforma.find({ saleId: sale._id }).lean()
+    const proformaIds = proformasToRestore.map((proforma) => proforma._id)
+    const invoiceEffectFilter =
+      proformaIds.length > 0
+        ? {
+            $or: [
+              { saleId: sale._id },
+              { proformaId: { $in: proformaIds } },
+            ],
+          }
+        : { saleId: sale._id }
+    const invoicesToRestore = await Invoice.find(invoiceEffectFilter).lean()
+    let invoicesDeleted = false
+    let proformasDeleted = false
+
     try {
+      await Invoice.deleteMany(invoiceEffectFilter)
+      invoicesDeleted = true
+      await Proforma.deleteMany({ saleId: sale._id })
+      proformasDeleted = true
       await sale.deleteOne()
     } catch (error) {
       if (shouldRestock && saleItems.length > 0) {
@@ -594,6 +615,20 @@ export async function DELETE(
               update: { $inc: { quantity: -item.quantity } },
             },
           }))
+        )
+      }
+      if (proformasDeleted && proformasToRestore.length > 0) {
+        await Proforma.insertMany(proformasToRestore, {
+          ordered: false,
+        }).catch((restoreError) => {
+          console.error("[Proforma Restore Error]", restoreError)
+        })
+      }
+      if (invoicesDeleted && invoicesToRestore.length > 0) {
+        await Invoice.insertMany(invoicesToRestore, { ordered: false }).catch(
+          (restoreError) => {
+            console.error("[Invoice Restore Error]", restoreError)
+          }
         )
       }
       throw error

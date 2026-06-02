@@ -40,14 +40,15 @@ export default async function ExpensesPage() {
     .lean<ExpensePageEntry[]>()
 
   const serializedExpenses = expenses.map((expense) => ({
-    ...expense,
     _id: expense._id.toString(),
-    createdAt: expense.createdAt?.toISOString(),
+    title: expense.title,
+    amount: expense.amount,
+    category: expense.category ?? "",
+    vendor: expense.vendor ?? "",
+    notes: expense.notes ?? "",
     incurredAt: expense.incurredAt?.toISOString(),
+    createdAt: expense.createdAt?.toISOString(),
     approvalStatus: expense.approvalStatus ?? "approved",
-    createdBy: isPopulatedExpenseUser(expense.createdBy)
-      ? expense.createdBy._id.toString()
-      : expense.createdBy?.toString(),
     createdByName: isPopulatedExpenseUser(expense.createdBy)
       ? expense.createdBy.name ?? expense.createdBy.email ?? "Unknown User"
       : "Unknown User",

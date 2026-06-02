@@ -25,6 +25,7 @@ type SalesPageSaleItem = {
 
 type SalesPageSale = {
   _id: { toString(): string }
+  saleDate?: Date
   createdAt?: Date
   updatedAt?: Date
   createdBy?: PopulatedSaleUser | { toString(): string }
@@ -70,54 +71,74 @@ export default async function SalesPage() {
   await connectToDatabase()
   const sales = await Sale.find()
     .populate("createdBy", "name email")
-    .sort({ createdAt: -1 })
+    .sort({ saleDate: -1, createdAt: -1 })
     .lean<SalesPageSale[]>()
   const products = await Product.find()
     .sort({ name: 1 })
     .lean<SalesPageProduct[]>()
 
-  const serializedSales = sales.map((sale) => ({
-    ...sale,
-    _id: sale._id.toString(),
-    approvalStatus: sale.approvalStatus ?? "approved",
-    createdAt: sale.createdAt?.toISOString(),
-    createdAtLabel: sale.createdAt
-      ? formatInKigali(sale.createdAt, {
-          year: "numeric",
-          month: "short",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: true,
-        })
-      : "-",
-    updatedAt: sale.updatedAt?.toISOString(),
-    customer: sale.customer
-      ? {
-          customerName: sale.customer.customerName ?? "",
-          customerPhone: sale.customer.customerPhone ?? "",
-        }
-      : undefined,
-    outstanding: sale.outstanding
-      ? {
-          ...sale.outstanding,
-          paymentDate: sale.outstanding.paymentDate?.toISOString(),
-        }
-      : undefined,
-    createdBy:
-      isPopulatedSaleUser(sale.createdBy)
+  const serializedSales = sales.map((sale) => {
+    const displayDate = sale.saleDate ?? sale.createdAt
+
+    return {
+      _id: sale._id.toString(),
+      items: sale.items.map((item) => ({
+        productId: item.productId.toString(),
+        name: item.name,
+        sku: item.sku,
+        unit: item.unit ?? "pcs",
+        quantity: item.quantity,
+        basePrice: item.basePrice,
+        sellingPrice: item.sellingPrice,
+        lineTotal: item.lineTotal,
+      })),
+      totalAmount: sale.totalAmount,
+      approvalStatus: sale.approvalStatus ?? "approved",
+      paymentStatus: sale.paymentStatus,
+      paymentMethod: sale.paymentMethod,
+      notes: sale.notes,
+      saleDate: sale.saleDate?.toISOString(),
+      saleDateLabel: displayDate
+        ? formatInKigali(displayDate, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+          })
+        : "-",
+      createdAt: sale.createdAt?.toISOString(),
+      createdAtLabel: sale.createdAt
+        ? formatInKigali(sale.createdAt, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
+          })
+        : "-",
+      updatedAt: sale.updatedAt?.toISOString(),
+      customer: sale.customer
+        ? {
+            customerName: sale.customer.customerName ?? "",
+            customerPhone: sale.customer.customerPhone ?? "",
+          }
+        : undefined,
+      outstanding: sale.outstanding
+        ? {
+            customerName: sale.outstanding.customerName,
+            customerPhone: sale.outstanding.customerPhone,
+            paymentDate: sale.outstanding.paymentDate?.toISOString(),
+          }
+        : undefined,
+      createdBy: isPopulatedSaleUser(sale.createdBy)
         ? sale.createdBy._id.toString()
         : sale.createdBy?.toString(),
-    createdByName:
-      isPopulatedSaleUser(sale.createdBy)
+      createdByName: isPopulatedSaleUser(sale.createdBy)
         ? sale.createdBy.name ?? sale.createdBy.email ?? "Unknown User"
         : "Unknown User",
-    items: sale.items.map((item) => ({
-      ...item,
-      productId: item.productId.toString(),
-    })),
-  }))
+    }
+  })
 
   const serializedProducts = products.map((product) => ({
     _id: product._id.toString(),

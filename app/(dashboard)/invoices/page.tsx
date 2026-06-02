@@ -7,6 +7,7 @@ import { formatInKigali } from "@/lib/utils/time"
 
 type InvoicePageSale = {
   _id: { toString(): string }
+  saleDate?: Date
   createdAt?: Date
   totalAmount: number
 }
@@ -22,23 +23,27 @@ export default async function InvoicesPage({
 
   await connectToDatabase()
   const sales = await Sale.find(approvedSaleFilter)
-    .select("totalAmount createdAt")
-    .sort({ createdAt: -1 })
+    .select("totalAmount saleDate createdAt")
+    .sort({ saleDate: -1, createdAt: -1 })
     .lean<InvoicePageSale[]>()
 
-  const serializedSales = sales.map((sale) => ({
-    _id: sale._id.toString(),
-    label: sale.createdAt
-      ? formatInKigali(sale.createdAt, {
-          month: "short",
-          day: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : sale._id.toString(),
-    totalAmount: sale.totalAmount,
-  }))
+  const serializedSales = sales.map((sale) => {
+    const displayDate = sale.saleDate ?? sale.createdAt
+
+    return {
+      _id: sale._id.toString(),
+      label: displayDate
+        ? formatInKigali(displayDate, {
+            month: "short",
+            day: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : sale._id.toString(),
+      totalAmount: sale.totalAmount,
+    }
+  })
 
   return (
     <InvoicesPageClient

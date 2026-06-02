@@ -8,9 +8,35 @@ export function approvedSaleDateFilter(dateRange: Record<string, unknown>) {
       approvedSaleFilter,
       {
         $or: [
-          { approvedAt: dateRange },
-          { approvedAt: { $exists: false }, createdAt: dateRange },
-          { approvedAt: null, createdAt: dateRange },
+          { saleDate: dateRange },
+          {
+            saleDate: { $exists: false },
+            approvedAt: dateRange,
+          },
+          {
+            saleDate: null,
+            approvedAt: dateRange,
+          },
+          {
+            saleDate: { $exists: false },
+            approvedAt: { $exists: false },
+            createdAt: dateRange,
+          },
+          {
+            saleDate: { $exists: false },
+            approvedAt: null,
+            createdAt: dateRange,
+          },
+          {
+            saleDate: null,
+            approvedAt: { $exists: false },
+            createdAt: dateRange,
+          },
+          {
+            saleDate: null,
+            approvedAt: null,
+            createdAt: dateRange,
+          },
         ],
       },
     ],

@@ -2,6 +2,11 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react"
 import { formatCurrency } from "@/lib/utils/format"
+import {
+  formatInKigali,
+  formatKigaliDateInput,
+  parseKigaliDateInput,
+} from "@/lib/utils/time"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -61,6 +66,8 @@ type SaleClient = {
     customerPhone?: string
   }
   outstanding?: OutstandingDetails
+  saleDate?: string
+  saleDateLabel?: string
   createdByName?: string
   createdAtLabel?: string
   createdAt?: string
@@ -111,7 +118,11 @@ export function SalesManager({
   canApproveSales: boolean
 }) {
   const [sales, setSales] = useState(initialSales)
+  const [productOptions, setProductOptions] = useState(products)
   const [draftItems, setDraftItems] = useState<DraftItem[]>([emptyDraft])
+  const [saleDate, setSaleDate] = useState(() =>
+    formatKigaliDateInput(new Date())
+  )
   const [notes, setNotes] = useState("")
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
@@ -123,6 +134,7 @@ export function SalesManager({
   const [invoiceError, setInvoiceError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [invoiceSubmitting, setInvoiceSubmitting] = useState(false)
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -133,6 +145,7 @@ export function SalesManager({
   const [activeEditSale, setActiveEditSale] = useState<SaleClient | null>(null)
   const [invoiceForm, setInvoiceForm] = useState(defaultInvoiceForm)
   const [editDraftItems, setEditDraftItems] = useState<DraftItem[]>([emptyDraft])
+  const [editSaleDate, setEditSaleDate] = useState("")
   const [editPaymentStatus, setEditPaymentStatus] =
     useState<InvoiceStatus>("paid")
   const [editPaymentMethod, setEditPaymentMethod] = useState<
@@ -169,8 +182,8 @@ export function SalesManager({
   }, [editDraftItems])
 
   const productMap = useMemo(
-    () => new Map(products.map((product) => [product._id, product])),
-    [products]
+    () => new Map(productOptions.map((product) => [product._id, product])),
+    [productOptions]
   )
 
   const filteredSales = useMemo(() => {
@@ -212,6 +225,10 @@ export function SalesManager({
   useEffect(() => {
     setCurrentPage(1)
   }, [saleSearch])
+
+  useEffect(() => {
+    setProductOptions(products)
+  }, [products])
 
   useEffect(() => {
     async function loadInvoices() {
@@ -278,6 +295,7 @@ export function SalesManager({
 
   const resetForm = () => {
     setDraftItems([emptyDraft])
+    setSaleDate(formatKigaliDateInput(new Date()))
     setNotes("")
     setCustomerName("")
     setCustomerPhone("")
@@ -313,7 +331,12 @@ export function SalesManager({
 
   const toDateInputValue = (value?: string) => {
     if (!value) return ""
-    return value.slice(0, 10)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ""
+
+    return formatKigaliDateInput(date)
   }
 
   const openEditDialog = (sale: SaleClient) => {
@@ -330,6 +353,7 @@ export function SalesManager({
     )
     setEditPaymentStatus(sale.paymentStatus)
     setEditPaymentMethod(sale.paymentMethod ?? "cash")
+    setEditSaleDate(toDateInputValue(sale.saleDate ?? sale.createdAt))
     setEditNotes(sale.notes ?? "")
     setEditCustomerName(
       sale.customer?.customerName ?? sale.outstanding?.customerName ?? ""
@@ -359,6 +383,41 @@ export function SalesManager({
     })
     return quantities
   }
+
+  const formatSaleDateLabel = (value?: string) => {
+    if (!value) return "-"
+    const date = parseKigaliDateInput(value) ?? new Date(value)
+    if (Number.isNaN(date.getTime())) return "-"
+
+    return formatInKigali(date, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+    })
+  }
+
+  const validateSaleDate = (
+    value: string,
+    setMessage: (message: string) => void
+  ) => {
+    const parsedDate = parseKigaliDateInput(value)
+    if (!parsedDate) {
+      setMessage("Sale date is required.")
+      return null
+    }
+
+    return value
+  }
+
+  const getSaleSortTime = (sale: SaleClient) => {
+    const value = sale.saleDate ?? sale.createdAt
+    if (!value) return 0
+    const date = parseKigaliDateInput(value) ?? new Date(value)
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime()
+  }
+
+  const sortSalesBySaleDate = (items: SaleClient[]) =>
+    [...items].sort((a, b) => getSaleSortTime(b) - getSaleSortTime(a))
 
   const validateDraftItems = (
     items: DraftItem[],
@@ -425,6 +484,8 @@ export function SalesManager({
 
     const payloadItems = validateSaleItems()
     if (!payloadItems) return
+    const payloadSaleDate = validateSaleDate(saleDate, setError)
+    if (!payloadSaleDate) return
 
     setSubmitting(true)
 
@@ -434,6 +495,7 @@ export function SalesManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: payloadItems,
+          saleDate: payloadSaleDate,
           paymentStatus,
           ...(paymentStatus === "paid" ? { paymentMethod } : {}),
           customer:
@@ -467,19 +529,25 @@ export function SalesManager({
       }
 
       const createdSale = body.data as SaleClient
-      setSales((current) => [
-        {
-          ...createdSale,
-          approvalStatus:
-            createdSale.approvalStatus ??
-            (canApproveSales ? "approved" : "pending"),
-          paymentStatus: createdSale.paymentStatus ?? paymentStatus,
-          paymentMethod:
-            createdSale.paymentMethod ??
-            (paymentStatus === "paid" ? paymentMethod : undefined),
-        },
-        ...current,
-      ])
+      setSales((current) =>
+        sortSalesBySaleDate([
+          {
+            ...createdSale,
+            saleDate: createdSale.saleDate ?? payloadSaleDate,
+            saleDateLabel:
+              createdSale.saleDateLabel ??
+              formatSaleDateLabel(createdSale.saleDate ?? payloadSaleDate),
+            approvalStatus:
+              createdSale.approvalStatus ??
+              (canApproveSales ? "approved" : "pending"),
+            paymentStatus: createdSale.paymentStatus ?? paymentStatus,
+            paymentMethod:
+              createdSale.paymentMethod ??
+              (paymentStatus === "paid" ? paymentMethod : undefined),
+          },
+          ...current,
+        ])
+      )
       setCurrentPage(1)
       setOutstandingDialogOpen(false)
       resetForm()
@@ -498,6 +566,8 @@ export function SalesManager({
 
     const payloadItems = validateSaleItems()
     if (!payloadItems) return
+    const payloadSaleDate = validateSaleDate(saleDate, setError)
+    if (!payloadSaleDate) return
 
     if (paymentStatus === "unpaid") {
       setOutstandingError(null)
@@ -582,6 +652,8 @@ export function SalesManager({
       activeEditSale
     )
     if (!payloadItems) return
+    const payloadSaleDate = validateSaleDate(editSaleDate, setEditError)
+    if (!payloadSaleDate) return
 
     if (editPaymentStatus === "unpaid") {
       if (!editOutstandingForm.customerName.trim()) {
@@ -608,6 +680,7 @@ export function SalesManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: payloadItems,
+          saleDate: payloadSaleDate,
           paymentStatus: editPaymentStatus,
           ...(editPaymentStatus === "paid" ? { paymentMethod: editPaymentMethod } : {}),
           customer:
@@ -638,18 +711,25 @@ export function SalesManager({
 
       const updatedSale = body.data as SaleClient
       setSales((current) =>
-        current.map((sale) =>
-          sale._id === activeEditSale._id
-            ? {
-                ...sale,
-                ...updatedSale,
-                _id: sale._id,
-                createdAtLabel: sale.createdAtLabel,
-                createdByName: sale.createdByName,
-                approvalStatus:
-                  updatedSale.approvalStatus ?? sale.approvalStatus,
-              }
-            : sale
+        sortSalesBySaleDate(
+          current.map((sale) =>
+            sale._id === activeEditSale._id
+              ? {
+                  ...sale,
+                  ...updatedSale,
+                  _id: sale._id,
+                  saleDate: updatedSale.saleDate ?? payloadSaleDate,
+                  saleDateLabel:
+                    updatedSale.saleDateLabel ??
+                    formatSaleDateLabel(
+                      updatedSale.saleDate ?? payloadSaleDate
+                    ),
+                  createdByName: sale.createdByName,
+                  approvalStatus:
+                    updatedSale.approvalStatus ?? sale.approvalStatus,
+                }
+              : sale
+          )
         )
       )
       setEditDialogOpen(false)
@@ -698,6 +778,62 @@ export function SalesManager({
       setError("Failed to approve sale.")
     } finally {
       setApprovingId(null)
+    }
+  }
+
+  const restoreDeletedSaleStock = (sale: SaleClient) => {
+    if ((sale.approvalStatus ?? "approved") !== "approved") return
+
+    const quantitiesByProduct = new Map<string, number>()
+    sale.items.forEach((item) => {
+      quantitiesByProduct.set(
+        item.productId,
+        (quantitiesByProduct.get(item.productId) ?? 0) + item.quantity
+      )
+    })
+
+    setProductOptions((current) =>
+      current.map((product) => {
+        const restoredQuantity = quantitiesByProduct.get(product._id)
+        if (!restoredQuantity) return product
+
+        return {
+          ...product,
+          quantity: product.quantity + restoredQuantity,
+        }
+      })
+    )
+  }
+
+  const deleteSale = async (sale: SaleClient) => {
+    const shouldDelete = window.confirm(
+      "Delete this sale? Stock, reports, loans, proformas, and invoices from this sale will be reversed or removed."
+    )
+    if (!shouldDelete) return
+
+    setError(null)
+    setDeletingId(sale._id)
+
+    try {
+      const response = await fetch(`/api/sales/${sale._id}`, {
+        method: "DELETE",
+      })
+      const body = await response.json().catch(() => null)
+
+      if (!response.ok || !body?.success) {
+        setError(body?.error ?? "Failed to delete sale.")
+        return
+      }
+
+      restoreDeletedSaleStock(sale)
+      setSales((current) => current.filter((item) => item._id !== sale._id))
+      setInvoicedSaleIds((current) =>
+        current.filter((saleId) => saleId !== sale._id)
+      )
+    } catch {
+      setError("Failed to delete sale.")
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -764,7 +900,7 @@ export function SalesManager({
                 <label className="grid gap-1 text-sm">
                   Product
                   <ProductSearchSelect
-                    products={products}
+                    products={productOptions}
                     value={item.productId}
                     onValueChange={(value) => {
                       const product = productMap.get(value)
@@ -829,7 +965,16 @@ export function SalesManager({
           </Button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="grid gap-1 text-sm">
+            Sale Date
+            <Input
+              type="date"
+              value={saleDate}
+              onChange={(event) => setSaleDate(event.target.value)}
+            />
+          </label>
+
           <label className="grid gap-1 text-sm">
             Payment Status
             <Select
@@ -911,7 +1056,10 @@ export function SalesManager({
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-        <Button onClick={submitSale} disabled={submitting || products.length === 0}>
+        <Button
+          onClick={submitSale}
+          disabled={submitting || productOptions.length === 0}
+        >
           {submitting ? "Recording..." : "Record Sale"}
         </Button>
       </section>
@@ -930,7 +1078,7 @@ export function SalesManager({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Time</TableHead>
+            <TableHead>Sale Date</TableHead>
             <TableHead>Items Sold</TableHead>
             <TableHead>Cost Price</TableHead>
             <TableHead>Sold Price</TableHead>
@@ -974,7 +1122,7 @@ export function SalesManager({
                     <TableRow key={`${sale._id}-${item.productId}-${itemIndex}`}>
                       {itemIndex === 0 ? (
                         <TableCell rowSpan={rowSpan}>
-                          {sale.createdAtLabel ?? "-"}
+                          {sale.saleDateLabel ?? sale.createdAtLabel ?? "-"}
                         </TableCell>
                       ) : null}
                       <TableCell>
@@ -1033,7 +1181,10 @@ export function SalesManager({
                                 <Button
                                   size="sm"
                                   onClick={() => approveSale(sale._id)}
-                                  disabled={approvingId === sale._id}
+                                  disabled={
+                                    approvingId === sale._id ||
+                                    deletingId === sale._id
+                                  }
                                 >
                                   {approvingId === sale._id
                                     ? "Approving..."
@@ -1045,9 +1196,24 @@ export function SalesManager({
                                   size="sm"
                                   variant="outline"
                                   onClick={() => openEditDialog(sale)}
-                                  disabled={invoicedSaleIdSet.has(sale._id)}
+                                  disabled={
+                                    deletingId === sale._id ||
+                                    invoicedSaleIdSet.has(sale._id)
+                                  }
                                 >
                                   Edit
+                                </Button>
+                              ) : null}
+                              {canApproveSales ? (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => deleteSale(sale)}
+                                  disabled={deletingId === sale._id}
+                                >
+                                  {deletingId === sale._id
+                                    ? "Deleting..."
+                                    : "Delete"}
                                 </Button>
                               ) : null}
                               <Button
@@ -1055,6 +1221,7 @@ export function SalesManager({
                                 variant="outline"
                                 onClick={() => openInvoiceDialog(sale)}
                                 disabled={
+                                  deletingId === sale._id ||
                                   isPending ||
                                   invoicedSaleIdSet.has(sale._id)
                                 }
@@ -1193,6 +1360,7 @@ export function SalesManager({
             setEditError(null)
             setActiveEditSale(null)
             setEditDraftItems([emptyDraft])
+            setEditSaleDate("")
             setEditPaymentStatus("paid")
             setEditPaymentMethod("cash")
             setEditNotes("")
@@ -1220,7 +1388,7 @@ export function SalesManager({
                   <label className="grid gap-1 text-sm">
                     Product
                     <ProductSearchSelect
-                      products={products}
+                      products={productOptions}
                       value={item.productId}
                       onValueChange={(value) => {
                         const product = productMap.get(value)
@@ -1291,7 +1459,16 @@ export function SalesManager({
             Add Item
           </Button>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="grid gap-1 text-sm">
+              Sale Date
+              <Input
+                type="date"
+                value={editSaleDate}
+                onChange={(event) => setEditSaleDate(event.target.value)}
+              />
+            </label>
+
             <label className="grid gap-1 text-sm">
               Payment Status
               <Select

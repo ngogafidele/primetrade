@@ -51,6 +51,7 @@ const SaleSchema = new Schema(
       required: true,
       default: "approved",
     },
+    saleDate: { type: Date },
     approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
     approvedAt: { type: Date },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },

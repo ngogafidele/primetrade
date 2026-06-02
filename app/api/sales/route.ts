@@ -6,6 +6,7 @@ import { requireAuth } from "@/lib/auth/middleware"
 import { CreateSaleSchema } from "@/lib/db/validators/sale"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 import { approvedSaleFilter } from "@/lib/db/sales-approval"
+import { parseKigaliDateInput } from "@/lib/utils/time"
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +19,10 @@ export async function GET(request: NextRequest) {
     }
 
     await connectToDatabase()
-    const sales = await Sale.find(approvedSaleFilter).sort({ createdAt: -1 })
+    const sales = await Sale.find(approvedSaleFilter).sort({
+      saleDate: -1,
+      createdAt: -1,
+    })
 
     return NextResponse.json({ success: true, data: sales })
   } catch (error) {
@@ -100,6 +104,14 @@ export async function POST(request: NextRequest) {
     const shouldApproveImmediately = session.isAdmin
     const approvalStatus = shouldApproveImmediately ? "approved" : "pending"
     const approvedAt = shouldApproveImmediately ? new Date() : undefined
+    const saleDate = payload.saleDate
+      ? parseKigaliDateInput(payload.saleDate) ?? new Date(payload.saleDate)
+      : new Date()
+
+    if (Number.isNaN(saleDate.getTime())) {
+      throw new Error("Sale date is invalid")
+    }
+
     const decrementedProducts: Array<{
       productId: string
       quantity: number
@@ -176,6 +188,7 @@ export async function POST(request: NextRequest) {
         paymentStatus: payload.paymentStatus,
         paymentMethod:
           payload.paymentStatus === "paid" ? payload.paymentMethod : undefined,
+        saleDate,
         approvalStatus,
         approvedBy: shouldApproveImmediately ? session.userId : undefined,
         approvedAt,

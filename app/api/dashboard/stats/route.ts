@@ -20,6 +20,7 @@ type DashboardSaleItem = {
 
 type DashboardRecentSale = {
   _id: { toString(): string }
+  saleDate?: Date
   createdAt?: Date
   approvedAt?: Date
   totalAmount: number
@@ -237,8 +238,8 @@ export async function GET(request: NextRequest) {
       .lean<DashboardLowStockProduct[]>()
 
     const recentSales = await Sale.find(approvedSaleFilter)
-      .select("totalAmount items createdAt approvedAt")
-      .sort({ createdAt: -1 })
+      .select("totalAmount items saleDate createdAt approvedAt")
+      .sort({ saleDate: -1, createdAt: -1 })
       .limit(6)
       .lean<DashboardRecentSale[]>()
 
@@ -335,7 +336,7 @@ export async function GET(request: NextRequest) {
         })),
         recentSales: recentSales.map((sale) => ({
           _id: sale._id.toString(),
-          createdAt: sale.approvedAt ?? sale.createdAt,
+          createdAt: sale.saleDate ?? sale.createdAt,
           totalAmount: sale.totalAmount,
           quantitySold: sale.items.reduce((acc, item) => acc + item.quantity, 0),
           units: Array.from(

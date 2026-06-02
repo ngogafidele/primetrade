@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         customerPhone: customerPhone ?? sales[0]?.outstanding?.customerPhone ?? "",
         totalAmount,
         sales: sales.map((sale) => ({
-          saleDate: sale.createdAt,
+          saleDate: sale.saleDate ?? sale.createdAt,
           paymentDate: sale.outstanding?.paymentDate,
           items:
             sale.items

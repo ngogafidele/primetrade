@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle2 } from "lucide-react"
+import { CheckCircle2, Trash2 } from "lucide-react"
 import { formatCurrency } from "@/lib/utils/format"
 import {
   formatInKigali,
@@ -64,6 +64,7 @@ export function ExpensesManager({
   const [formState, setFormState] = useState<FormState>(emptyForm)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
 
   const pageCount = Math.max(1, Math.ceil(expenses.length / EXPENSES_PER_PAGE))
@@ -171,6 +172,36 @@ export function ExpensesManager({
       setError("Failed to approve expense.")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const deleteExpense = async (expense: ExpenseClient) => {
+    const shouldDelete = window.confirm(
+      "Delete this expense? Reports, dashboard totals, and pending approvals will no longer include it."
+    )
+    if (!shouldDelete) return
+
+    setError(null)
+    setDeletingId(expense._id)
+
+    try {
+      const response = await fetch(`/api/expenses/${expense._id}`, {
+        method: "DELETE",
+      })
+      const body = await response.json().catch(() => null)
+
+      if (!response.ok || !body?.success) {
+        setError(body?.error ?? "Failed to delete expense.")
+        return
+      }
+
+      setExpenses((current) =>
+        current.filter((item) => item._id !== expense._id)
+      )
+    } catch {
+      setError("Failed to delete expense.")
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -329,16 +360,27 @@ export function ExpensesManager({
                 </TableCell>
                 {canApproveExpenses ? (
                   <TableCell className="text-right">
-                    {(expense.approvalStatus ?? "approved") === "pending" ? (
+                    <div className="flex justify-end gap-2">
+                      {(expense.approvalStatus ?? "approved") === "pending" ? (
+                        <Button
+                          size="sm"
+                          onClick={() => approveExpense(expense)}
+                          disabled={submitting || deletingId === expense._id}
+                        >
+                          <CheckCircle2 className="size-4" />
+                          Approve
+                        </Button>
+                      ) : null}
                       <Button
                         size="sm"
-                        onClick={() => approveExpense(expense)}
-                        disabled={submitting}
+                        variant="destructive"
+                        onClick={() => deleteExpense(expense)}
+                        disabled={submitting || deletingId === expense._id}
                       >
-                        <CheckCircle2 className="size-4" />
-                        Approve
+                        <Trash2 className="size-4" />
+                        {deletingId === expense._id ? "Deleting..." : "Delete"}
                       </Button>
-                    ) : null}
+                    </div>
                   </TableCell>
                 ) : null}
               </TableRow>

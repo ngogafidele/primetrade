@@ -30,6 +30,7 @@ export const CreateSaleSchema = z
     items: z.array(SaleItemSchema).min(1),
     paymentStatus: z.enum(["paid", "unpaid"]),
     paymentMethod: z.enum(["cash", "mobile-money", "bank"]).optional(),
+    saleDate: z.string().trim().min(1).optional(),
     notes: z.string().optional(),
     customer: SaleCustomerSchema,
     outstanding: OutstandingDetailsSchema.optional(),
