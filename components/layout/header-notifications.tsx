@@ -21,6 +21,13 @@ export type HeaderNotificationSale = {
   createdAtLabel: string
 }
 
+export type HeaderNotificationBelowCostSale = {
+  _id: string
+  totalAmount: number
+  belowCostItemCount: number
+  saleDateLabel: string
+}
+
 export type HeaderNotificationLoan = {
   _id: string
   customerName: string
@@ -44,10 +51,20 @@ export type HeaderNotificationExpense = {
   createdAtLabel: string
 }
 
+export type HeaderNotificationBelowCostProduct = {
+  _id: string
+  name: string
+  sku: string
+  costPrice: number
+  price: number
+}
+
 export type HeaderNotifications = {
   pendingSales: HeaderNotificationSale[]
+  belowCostSales: HeaderNotificationBelowCostSale[]
   pendingProformas: HeaderNotificationProforma[]
   pendingExpenses: HeaderNotificationExpense[]
+  belowCostProducts: HeaderNotificationBelowCostProduct[]
   dueLoans: HeaderNotificationLoan[]
   overdueLoans: HeaderNotificationLoan[]
 }
@@ -62,8 +79,10 @@ export function HeaderNotificationsButton({
   const totalCount = useMemo(
     () =>
       notifications.pendingSales.length +
+      notifications.belowCostSales.length +
       notifications.pendingProformas.length +
       notifications.pendingExpenses.length +
+      notifications.belowCostProducts.length +
       notifications.dueLoans.length +
       notifications.overdueLoans.length,
     [notifications]
@@ -145,7 +164,7 @@ export function HeaderNotificationsButton({
           {totalCount === 0 ? (
             <div className="flex items-start gap-2 rounded-lg border border-border/80 bg-muted/40 p-3 text-sm">
               <CheckCircle2 className="mt-0.5 size-4 text-emerald-600" />
-              <p>No pending approvals or due loans.</p>
+              <p>No admin items need attention.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -185,6 +204,24 @@ export function HeaderNotificationsButton({
               />
 
               <NotificationGroup
+                href="/sales"
+                icon={<AlertTriangle className="size-4 text-amber-600" />}
+                items={notifications.belowCostSales}
+                label="Sales recorded below cost"
+                onNavigate={() => setOpen(false)}
+                renderItem={(sale) => (
+                  <>
+                    <span>{formatCurrency(sale.totalAmount)}</span>
+                    <span className="text-muted-foreground">
+                      {sale.belowCostItemCount} below-cost{" "}
+                      {sale.belowCostItemCount === 1 ? "item" : "items"} -{" "}
+                      {sale.saleDateLabel}
+                    </span>
+                  </>
+                )}
+              />
+
+              <NotificationGroup
                 href="/expenses"
                 icon={<Wallet className="size-4 text-primary" />}
                 items={notifications.pendingExpenses}
@@ -195,6 +232,25 @@ export function HeaderNotificationsButton({
                     <span>{expense.title}</span>
                     <span className="text-muted-foreground">
                       {formatCurrency(expense.amount)} - {expense.createdAtLabel}
+                    </span>
+                  </>
+                )}
+              />
+
+              <NotificationGroup
+                href="/products"
+                icon={<AlertTriangle className="size-4 text-amber-600" />}
+                items={notifications.belowCostProducts}
+                label="Products selling below cost"
+                onNavigate={() => setOpen(false)}
+                renderItem={(product) => (
+                  <>
+                    <span>
+                      {product.name} ({product.sku})
+                    </span>
+                    <span className="text-muted-foreground">
+                      Selling {formatCurrency(product.price)} - Cost{" "}
+                      {formatCurrency(product.costPrice)}
                     </span>
                   </>
                 )}

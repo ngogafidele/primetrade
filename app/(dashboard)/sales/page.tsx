@@ -52,6 +52,7 @@ type SalesPageProduct = {
   sku: string
   unit?: string
   quantity: number
+  costPrice: number
   price: number
 }
 
@@ -146,6 +147,7 @@ export default async function SalesPage() {
     sku: product.sku,
     unit: product.unit ?? "pcs",
     quantity: product.quantity,
+    costPrice: product.costPrice,
     price: product.price,
   }))
 

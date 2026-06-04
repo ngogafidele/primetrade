@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { formatCurrency } from "@/lib/utils/format"
 import { FileText, PackagePlus, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -104,6 +105,7 @@ export function ProductsManager({
   initialProducts,
   isAdmin,
 }: ProductsManagerProps) {
+  const router = useRouter()
   const [products, setProducts] = useState(initialProducts)
   const [search, setSearch] = useState("")
   const [formState, setFormState] = useState<FormState>(() => createEmptyForm())
@@ -272,6 +274,7 @@ export function ProductsManager({
       setCurrentPage(1)
       setDialogOpen(false)
       resetForm()
+      router.refresh()
     } catch {
       setError("Failed to save products.")
     } finally {
@@ -326,6 +329,7 @@ export function ProductsManager({
 
       setDialogOpen(false)
       resetForm()
+      router.refresh()
     } catch (err) {
       setError("Failed to save product.")
     } finally {
@@ -385,6 +389,7 @@ export function ProductsManager({
       setSupplyDialogOpen(false)
       setActiveSupplyProduct(null)
       setSupplyForm(createEmptySupplyForm())
+      router.refresh()
     } catch {
       setSupplyError("Failed to receive stock.")
     } finally {
@@ -413,6 +418,7 @@ export function ProductsManager({
       setProducts((current) =>
         current.filter((product) => product._id !== productId)
       )
+      router.refresh()
     } catch (err) {
       setError("Failed to delete product.")
     } finally {
@@ -562,7 +568,8 @@ export function ProductsManager({
                     </div>
                     {showPriceWarning ? (
                       <p className="text-sm text-amber-600">
-                        Warning: selling price is lower than the cost price.
+                        Warning: selling price is lower than the cost price. This
+                        product will remain in admin notifications until corrected.
                       </p>
                     ) : null}
                   </div>
@@ -693,6 +700,8 @@ export function ProductsManager({
                             {belowCost ? (
                               <p className="mt-2 text-sm text-amber-600">
                                 Warning: selling price is lower than the cost price.
+                                This product will remain in admin notifications until
+                                corrected.
                               </p>
                             ) : null}
                           </section>
@@ -893,7 +902,14 @@ export function ProductsManager({
             </TableRow>
           ) : (
             paginatedProducts.map((product) => (
-              <TableRow key={product._id.toString()}>
+              <TableRow
+                key={product._id.toString()}
+                className={
+                  product.price < (product.costPrice ?? 0)
+                    ? "bg-amber-50 hover:bg-amber-100/80"
+                    : undefined
+                }
+              >
                 <TableCell>{product.name}</TableCell>
                 <TableCell>{product.sku}</TableCell>
                 <TableCell>
@@ -916,7 +932,10 @@ export function ProductsManager({
                   <div className="flex flex-wrap items-center gap-2">
                     <span>{formatCurrency(product.price)}</span>
                     {product.price < (product.costPrice ?? 0) ? (
-                      <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                      <span
+                        className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
+                        title="Selling price is lower than cost price and requires admin attention"
+                      >
                         Below cost
                       </span>
                     ) : null}

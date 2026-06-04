@@ -4,6 +4,7 @@ import type { HeaderNotifications } from "@/components/layout/header-notificatio
 import { requireServerSession } from "@/lib/auth/server"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Expense } from "@/lib/db/models/Expense"
+import { Product } from "@/lib/db/models/Product"
 import { Proforma } from "@/lib/db/models/Proforma"
 import { Sale } from "@/lib/db/models/Sale"
 import { User } from "@/lib/db/models/User"
@@ -20,6 +21,17 @@ type PendingSaleNotification = {
   createdAt?: Date
 }
 
+type BelowCostSaleNotification = {
+  _id: { toString(): string }
+  totalAmount: number
+  saleDate?: Date
+  createdAt?: Date
+  items: Array<{
+    basePrice: number
+    sellingPrice: number
+  }>
+}
+
 type PendingProformaNotification = {
   _id: { toString(): string }
   proformaNumber: string
@@ -33,6 +45,14 @@ type PendingExpenseNotification = {
   title: string
   amount: number
   createdAt?: Date
+}
+
+type BelowCostProductNotification = {
+  _id: { toString(): string }
+  name: string
+  sku: string
+  costPrice: number
+  price: number
 }
 
 type LoanNotification = {
@@ -56,12 +76,38 @@ async function getHeaderNotifications(): Promise<HeaderNotifications> {
   await connectToDatabase()
 
   const today = getKigaliDateNumber(new Date())
-  const [pendingSales, pendingProformas, pendingExpenses, loanSales] =
+  const [
+    pendingSales,
+    belowCostSales,
+    pendingProformas,
+    pendingExpenses,
+    belowCostProducts,
+    loanSales,
+  ] =
     await Promise.all([
       Sale.find({ approvalStatus: "pending" })
         .select("totalAmount createdAt")
         .sort({ createdAt: -1 })
         .lean<PendingSaleNotification[]>(),
+      Sale.find({
+        $expr: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: { $ifNull: ["$items", []] },
+                  as: "item",
+                  cond: { $lt: ["$$item.sellingPrice", "$$item.basePrice"] },
+                },
+              },
+            },
+            0,
+          ],
+        },
+      })
+        .select("totalAmount saleDate createdAt items.basePrice items.sellingPrice")
+        .sort({ saleDate: -1, createdAt: -1 })
+        .lean<BelowCostSaleNotification[]>(),
       Proforma.find({ approvalStatus: "pending" })
         .select("proformaNumber customerName totalAmount createdAt")
         .sort({ createdAt: -1 })
@@ -70,6 +116,12 @@ async function getHeaderNotifications(): Promise<HeaderNotifications> {
         .select("title amount createdAt")
         .sort({ createdAt: -1 })
         .lean<PendingExpenseNotification[]>(),
+      Product.find({
+        $expr: { $lt: ["$price", { $ifNull: ["$costPrice", 0] }] },
+      })
+        .select("name sku costPrice price")
+        .sort({ name: 1 })
+        .lean<BelowCostProductNotification[]>(),
       Sale.find({ ...approvedSaleFilter, paymentStatus: "unpaid" })
         .select("totalAmount outstanding")
         .sort({ "outstanding.paymentDate": 1, createdAt: -1 })
@@ -102,6 +154,18 @@ async function getHeaderNotifications(): Promise<HeaderNotifications> {
         minute: "2-digit",
       }),
     })),
+    belowCostSales: belowCostSales.map((sale) => ({
+      _id: sale._id.toString(),
+      totalAmount: sale.totalAmount,
+      belowCostItemCount: sale.items.filter(
+        (item) => item.sellingPrice < item.basePrice
+      ).length,
+      saleDateLabel: formatInKigali(sale.saleDate ?? sale.createdAt, {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+      }),
+    })),
     pendingProformas: pendingProformas.map((proforma) => ({
       _id: proforma._id.toString(),
       number: proforma.proformaNumber,
@@ -126,6 +190,13 @@ async function getHeaderNotifications(): Promise<HeaderNotifications> {
         hour: "2-digit",
         minute: "2-digit",
       }),
+    })),
+    belowCostProducts: belowCostProducts.map((product) => ({
+      _id: product._id.toString(),
+      name: product.name,
+      sku: product.sku,
+      costPrice: product.costPrice,
+      price: product.price,
     })),
     dueLoans: today
       ? loans

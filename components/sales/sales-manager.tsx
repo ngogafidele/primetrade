@@ -1,10 +1,13 @@
 "use client"
 
 import { Fragment, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { FileText } from "lucide-react"
 import { formatCurrency } from "@/lib/utils/format"
 import {
   formatInKigali,
   formatKigaliDateInput,
+  getKigaliDateParts,
   parseKigaliDateInput,
 } from "@/lib/utils/time"
 import { Button } from "@/components/ui/button"
@@ -38,6 +41,7 @@ type ProductOption = {
   name: string
   sku: string
   unit: string
+  costPrice: number
   price: number
   quantity: number
 }
@@ -106,6 +110,22 @@ const defaultOutstandingForm: OutstandingDetails = {
   paymentDate: "",
 }
 
+function getDefaultPdfRange() {
+  const now = new Date()
+  const parts = getKigaliDateParts(now)
+  const today = formatKigaliDateInput(now)
+  return {
+    from: `${parts.year}-${String(parts.month).padStart(2, "0")}-01`,
+    to: today,
+  }
+}
+
+function getDownloadFilename(response: Response) {
+  const disposition = response.headers.get("Content-Disposition")
+  const match = disposition?.match(/filename="([^"]+)"/)
+  return match?.[1] ?? "sales-list.pdf"
+}
+
 export function SalesManager({
   initialSales,
   products,
@@ -117,6 +137,7 @@ export function SalesManager({
   currentUserLabel: string
   canApproveSales: boolean
 }) {
+  const router = useRouter()
   const [sales, setSales] = useState(initialSales)
   const [productOptions, setProductOptions] = useState(products)
   const [draftItems, setDraftItems] = useState<DraftItem[]>([emptyDraft])
@@ -162,6 +183,8 @@ export function SalesManager({
   const [editError, setEditError] = useState<string | null>(null)
   const [invoicedSaleIds, setInvoicedSaleIds] = useState<string[]>([])
   const [saleSearch, setSaleSearch] = useState("")
+  const [pdfRange, setPdfRange] = useState(() => getDefaultPdfRange())
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
 
   const draftTotal = useMemo(() => {
     return draftItems.reduce((sum, item) => {
@@ -551,6 +574,7 @@ export function SalesManager({
       setCurrentPage(1)
       setOutstandingDialogOpen(false)
       resetForm()
+      router.refresh()
     } catch {
       setError("Failed to record sale.")
       if (paymentStatus === "unpaid") {
@@ -734,6 +758,7 @@ export function SalesManager({
       )
       setEditDialogOpen(false)
       setActiveEditSale(null)
+      router.refresh()
     } catch {
       setEditError("Failed to edit sale.")
     } finally {
@@ -774,6 +799,7 @@ export function SalesManager({
             : sale
         )
       )
+      router.refresh()
     } catch {
       setError("Failed to approve sale.")
     } finally {
@@ -830,6 +856,7 @@ export function SalesManager({
       setInvoicedSaleIds((current) =>
         current.filter((saleId) => saleId !== sale._id)
       )
+      router.refresh()
     } catch {
       setError("Failed to delete sale.")
     } finally {
@@ -867,6 +894,49 @@ export function SalesManager({
     [invoicedSaleIds]
   )
 
+  const isDraftItemBelowCost = (
+    item: DraftItem,
+    product: ProductOption | null | undefined
+  ) => {
+    if (!product || item.sellingPrice.trim() === "") return false
+
+    const sellingPrice = Number(item.sellingPrice)
+    return Number.isFinite(sellingPrice) && sellingPrice < product.costPrice
+  }
+
+  const downloadSalesListPdf = async () => {
+    setIsDownloadingPdf(true)
+    setError(null)
+
+    try {
+      const params = new URLSearchParams({
+        from: pdfRange.from,
+        to: pdfRange.to,
+      })
+      const response = await fetch(`/api/sales/pdf?${params.toString()}`)
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null)
+        setError(body?.error ?? "Failed to download sales list PDF.")
+        return
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = getDownloadFilename(response)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError("Failed to download sales list PDF.")
+    } finally {
+      setIsDownloadingPdf(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -878,12 +948,52 @@ export function SalesManager({
           Logged in as: {currentUserLabel}
         </p>
         {canApproveSales ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 shadow-sm">
             Pending sales enter stock, dashboards, reports, loans, and invoices
             only after approval.
           </p>
         ) : null}
       </div>
+
+      {canApproveSales ? (
+        <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row sm:items-end">
+          <label className="grid gap-1 text-sm">
+            PDF From
+            <Input
+              type="date"
+              value={pdfRange.from}
+              onChange={(event) =>
+                setPdfRange((current) => ({
+                  ...current,
+                  from: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            PDF To
+            <Input
+              type="date"
+              value={pdfRange.to}
+              onChange={(event) =>
+                setPdfRange((current) => ({
+                  ...current,
+                  to: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={downloadSalesListPdf}
+            disabled={isDownloadingPdf || !pdfRange.from || !pdfRange.to}
+          >
+            <FileText className="size-4" />
+            {isDownloadingPdf ? "Preparing PDF..." : "Sales List PDF"}
+          </Button>
+        </section>
+      ) : null}
 
       <section className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
         <h3 className="text-lg font-semibold">Record Sale</h3>
@@ -892,6 +1002,7 @@ export function SalesManager({
             const selectedProduct = item.productId
               ? productMap.get(item.productId)
               : null
+            const isBelowCost = isDraftItemBelowCost(item, selectedProduct)
             return (
               <div
                 key={`${index}-${item.productId}`}
@@ -950,9 +1061,18 @@ export function SalesManager({
                 </div>
 
                 {selectedProduct ? (
-                  <p className="md:col-span-4 text-xs text-muted-foreground">
-                    Base price: {formatCurrency(selectedProduct.price)} | Available: {selectedProduct.quantity} {selectedProduct.unit}
-                  </p>
+                  <div className="md:col-span-4 space-y-1 text-xs">
+                    <p className="text-muted-foreground">
+                      Cost price: {formatCurrency(selectedProduct.costPrice)} |
+                      Default selling price: {formatCurrency(selectedProduct.price)} |
+                      Available: {selectedProduct.quantity} {selectedProduct.unit}
+                    </p>
+                    {isBelowCost ? (
+                      <p className="font-medium text-amber-600">
+                        Warning: selling price is lower than the cost price.
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             )
@@ -1119,7 +1239,14 @@ export function SalesManager({
               return (
                 <Fragment key={sale._id}>
                   {items.map((item, itemIndex) => (
-                    <TableRow key={`${sale._id}-${item.productId}-${itemIndex}`}>
+                    <TableRow
+                      key={`${sale._id}-${item.productId}-${itemIndex}`}
+                      className={
+                        item.sellingPrice < (item.basePrice ?? 0)
+                          ? "bg-amber-50 hover:bg-amber-100/80"
+                          : undefined
+                      }
+                    >
                       {itemIndex === 0 ? (
                         <TableCell rowSpan={rowSpan}>
                           {sale.saleDateLabel ?? sale.createdAtLabel ?? "-"}
@@ -1139,7 +1266,19 @@ export function SalesManager({
                         </div>
                       </TableCell>
                       <TableCell>{formatCurrency(item.basePrice ?? 0)}</TableCell>
-                      <TableCell>{formatCurrency(item.sellingPrice)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{formatCurrency(item.sellingPrice)}</span>
+                          {item.sellingPrice < (item.basePrice ?? 0) ? (
+                            <span
+                              className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
+                              title="Selling price was lower than the cost price for this sale"
+                            >
+                              Below cost
+                            </span>
+                          ) : null}
+                        </div>
+                      </TableCell>
                       {itemIndex === 0 ? (
                         <>
                           <TableCell rowSpan={rowSpan}>
@@ -1380,6 +1519,7 @@ export function SalesManager({
               const selectedProduct = item.productId
                 ? productMap.get(item.productId)
                 : null
+              const isBelowCost = isDraftItemBelowCost(item, selectedProduct)
               return (
                 <div
                   key={`edit-${index}-${item.productId}`}
@@ -1444,11 +1584,19 @@ export function SalesManager({
                   </div>
 
                   {selectedProduct ? (
-                    <p className="md:col-span-4 text-xs text-muted-foreground">
-                      Base price: {formatCurrency(selectedProduct.price)} |
-                      Available: {selectedProduct.quantity}{" "}
-                      {selectedProduct.unit}
-                    </p>
+                    <div className="md:col-span-4 space-y-1 text-xs">
+                      <p className="text-muted-foreground">
+                        Cost price: {formatCurrency(selectedProduct.costPrice)} |
+                        Default selling price: {formatCurrency(selectedProduct.price)} |
+                        Available: {selectedProduct.quantity}{" "}
+                        {selectedProduct.unit}
+                      </p>
+                      {isBelowCost ? (
+                        <p className="font-medium text-amber-600">
+                          Warning: selling price is lower than the cost price.
+                        </p>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               )
