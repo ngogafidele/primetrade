@@ -87,6 +87,7 @@ const printColor = {
   headerBackground: "#1d4ed8",
   headerText: "#ffffff",
   rowBackground: "#BFDBFE",
+  warningBackground: "#FEF3C7",
   rule: "#000000",
 }
 
@@ -209,6 +210,17 @@ export async function generateProductsCatalogPDF(
       align: "right",
       width: 216,
     })
+    .text(
+      `Amber rows are below cost (${data.products.filter(
+        (product) => product.price < (product.costPrice ?? 0)
+      ).length} products).`,
+      590,
+      98,
+      {
+        align: "right",
+        width: 216,
+      }
+    )
 
   doc
     .fontSize(10)
@@ -242,11 +254,18 @@ export async function generateProductsCatalogPDF(
     }
 
     const isLowStock = product.quantity <= (product.lowStockThreshold ?? 0)
+    const isBelowCost = product.price < (product.costPrice ?? 0)
     const status = isLowStock ? "Low" : "In stock"
     const textY = y + 5
 
     doc
-      .fillColor(index % 2 === 0 ? "#ffffff" : printColor.rowBackground)
+      .fillColor(
+        isBelowCost
+          ? printColor.warningBackground
+          : index % 2 === 0
+            ? "#ffffff"
+            : printColor.rowBackground
+      )
       .rect(table.x, y, table.width, table.rowHeight)
       .fill()
       .font("Helvetica")
