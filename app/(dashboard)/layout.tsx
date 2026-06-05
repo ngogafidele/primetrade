@@ -9,6 +9,7 @@ import { Proforma } from "@/lib/db/models/Proforma"
 import { Sale } from "@/lib/db/models/Sale"
 import { User } from "@/lib/db/models/User"
 import { approvedSaleFilter } from "@/lib/db/sales-approval"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { formatInKigali, getKigaliDateParts } from "@/lib/utils/time"
 
 type DashboardLayoutUser = {
@@ -85,11 +86,12 @@ async function getHeaderNotifications(): Promise<HeaderNotifications> {
     loanSales,
   ] =
     await Promise.all([
-      Sale.find({ approvalStatus: "pending" })
+      Sale.find({ approvalStatus: "pending", ...activeRecordFilter })
         .select("totalAmount createdAt")
         .sort({ createdAt: -1 })
         .lean<PendingSaleNotification[]>(),
       Sale.find({
+        ...activeRecordFilter,
         $expr: {
           $gt: [
             {
@@ -117,6 +119,7 @@ async function getHeaderNotifications(): Promise<HeaderNotifications> {
         .sort({ createdAt: -1 })
         .lean<PendingExpenseNotification[]>(),
       Product.find({
+        ...activeRecordFilter,
         $expr: { $lt: ["$price", { $ifNull: ["$costPrice", 0] }] },
       })
         .select("name sku costPrice price")

@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { requireAuth } from "@/lib/auth/middleware"
 import { Proforma } from "@/lib/db/models/Proforma"
 import { Sale } from "@/lib/db/models/Sale"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import {
   CreateProformaSchema,
   ProformaListQuerySchema,
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
     await connectToDatabase()
 
     const sale = payload.saleId
-      ? await Sale.findById(payload.saleId)
+      ? await Sale.findOne({ _id: payload.saleId, ...activeRecordFilter })
       : null
 
     if (payload.saleId && !sale) {

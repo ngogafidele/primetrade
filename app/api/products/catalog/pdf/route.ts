@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireAuth } from "@/lib/auth/middleware"
+import { requireAdmin } from "@/lib/auth/middleware"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
 import { ProductSupply } from "@/lib/db/models/ProductSupply"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { generateProductsCatalogPDF } from "@/lib/pdf/products-catalog-generator"
 
 type CatalogProduct = {
@@ -25,17 +26,17 @@ type LatestProductSupply = {
 
 export async function GET(request: NextRequest) {
   try {
-    const { authorized, session } = await requireAuth(request)
-    if (!authorized || !session) {
+    const { authorized } = await requireAdmin(request)
+    if (!authorized) {
       return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
+        { success: false, error: "Admin only" },
+        { status: 403 }
       )
     }
 
     await connectToDatabase()
     const [products, latestSupplies] = await Promise.all([
-      Product.find().sort({ name: 1 }).lean<CatalogProduct[]>(),
+      Product.find(activeRecordFilter).sort({ name: 1 }).lean<CatalogProduct[]>(),
       ProductSupply.aggregate<LatestProductSupply>([
         { $sort: { suppliedAt: -1, createdAt: -1 } },
         {

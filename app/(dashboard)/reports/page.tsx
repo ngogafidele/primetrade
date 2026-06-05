@@ -10,6 +10,7 @@ import { ReturnTransaction } from "@/lib/db/models/Return"
 import { Sale } from "@/lib/db/models/Sale"
 import { StockAdjustment } from "@/lib/db/models/StockAdjustment"
 import { approvedSaleDateFilter } from "@/lib/db/sales-approval"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { formatCurrency } from "@/lib/utils/format"
 import {
   formatInKigali,
@@ -278,7 +279,7 @@ export default async function ReportsPage({
     recentSales,
   ] = await Promise.all([
     Product.aggregate<ProductTotals>([
-      { $match: {} },
+      { $match: activeRecordFilter },
       {
         $group: {
           _id: null,
@@ -321,7 +322,7 @@ export default async function ReportsPage({
       },
     ]),
     Invoice.aggregate<InvoiceTotals>([
-      { $match: { issuedAt: periodFilter } },
+      { $match: { issuedAt: periodFilter, ...activeRecordFilter } },
       {
         $group: {
           _id: null,

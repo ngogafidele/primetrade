@@ -6,6 +6,11 @@ import { requireAuth } from "@/lib/auth/middleware"
 import { CreateSaleSchema } from "@/lib/db/validators/sale"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 import { approvedSaleFilter } from "@/lib/db/sales-approval"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
+import {
+  serializeSaleForSession,
+  serializeSalesForSession,
+} from "@/lib/db/sales-serialization"
 import { parseKigaliDateInput } from "@/lib/utils/time"
 
 export async function GET(request: NextRequest) {
@@ -24,7 +29,10 @@ export async function GET(request: NextRequest) {
       createdAt: -1,
     })
 
-    return NextResponse.json({ success: true, data: sales })
+    return NextResponse.json({
+      success: true,
+      data: serializeSalesForSession(sales, session.isAdmin),
+    })
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch sales" },
@@ -50,7 +58,10 @@ export async function POST(request: NextRequest) {
     const productIds = Array.from(
       new Set(payload.items.map((item) => item.productId))
     )
-    const products = await Product.find({ _id: { $in: productIds } })
+    const products = await Product.find({
+      _id: { $in: productIds },
+      ...activeRecordFilter,
+    })
 
     if (products.length !== productIds.length) {
       return NextResponse.json(
@@ -120,7 +131,7 @@ export async function POST(request: NextRequest) {
     if (shouldApproveImmediately) {
       for (const [productId, quantity] of requestedQuantities.entries()) {
         const result = await Product.updateOne(
-          { _id: productId, quantity: { $gte: quantity } },
+          { _id: productId, ...activeRecordFilter, quantity: { $gte: quantity } },
           { $inc: { quantity: -quantity } }
         )
 
@@ -211,7 +222,16 @@ export async function POST(request: NextRequest) {
       )
     } catch (error) {
       if (sale?._id) {
-        await Sale.collection.deleteOne({ _id: sale._id })
+        await Sale.collection.updateOne(
+          { _id: sale._id },
+          {
+            $set: {
+              deletedAt: new Date(),
+              deletedBy: session.userId,
+              deletedReason: "sale_creation_failed",
+            },
+          }
+        )
       }
       if (decrementedProducts.length > 0) {
         await Product.bulkWrite(
@@ -249,8 +269,7 @@ export async function POST(request: NextRequest) {
       console.error("[Low Stock Alert Sync Error]", error)
     }
 
-    const saleData =
-      typeof sale.toObject === "function" ? sale.toObject() : sale
+    const saleData = serializeSaleForSession(sale, session.isAdmin)
 
     return NextResponse.json(
       {

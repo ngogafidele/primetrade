@@ -4,12 +4,13 @@ import { Product } from "@/lib/db/models/Product"
 import { ProductSupply } from "@/lib/db/models/ProductSupply"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
 import { UpdateProductSchema } from "@/lib/db/validators/product"
-import { syncLowStockAlert } from "@/lib/db/alerts"
+import { resolveLowStockAlerts, syncLowStockAlert } from "@/lib/db/alerts"
 import {
   duplicateKeyIncludes,
   isDuplicateKeyError,
   productNameExists,
 } from "@/lib/db/products"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { serializeProduct } from "@/lib/products/serialization"
 import { ZodError } from "zod"
 
@@ -36,7 +37,7 @@ export async function GET(
     const { id } = await context.params
 
     await connectToDatabase()
-    const product = await Product.findById(id)
+    const product = await Product.findOne({ _id: id, ...activeRecordFilter })
 
     if (!product) {
       return NextResponse.json(
@@ -53,7 +54,7 @@ export async function GET(
         ...product.toObject(),
         supplierName: latestSupply?.supplierName,
         lastRestockAt: latestSupply?.suppliedAt,
-      }),
+      }, { includeCostPrice: session.isAdmin }),
     })
   } catch (error) {
     return NextResponse.json(
@@ -91,7 +92,7 @@ export async function PUT(
     }
 
     const product = await Product.findOneAndUpdate(
-      { _id: id },
+      { _id: id, ...activeRecordFilter },
       updateInput,
       { returnDocument: "after", runValidators: true }
     )
@@ -119,7 +120,7 @@ export async function PUT(
         ...product.toObject(),
         supplierName: latestSupply?.supplierName,
         lastRestockAt: latestSupply?.suppliedAt,
-      }),
+      }, { includeCostPrice: true }),
     })
   } catch (error) {
     if (error instanceof ZodError) {
@@ -160,13 +161,29 @@ export async function DELETE(
 
     const { id } = await context.params
     await connectToDatabase()
-    const product = await Product.findOneAndDelete({ _id: id })
+    const product = await Product.findOneAndUpdate(
+      { _id: id, ...activeRecordFilter },
+      {
+        $set: {
+          deletedAt: new Date(),
+          deletedBy: session.userId,
+          deletedReason: "product_deleted",
+        },
+      },
+      { returnDocument: "after" }
+    )
 
     if (!product) {
       return NextResponse.json(
         { success: false, error: "Product not found" },
         { status: 404 }
       )
+    }
+
+    try {
+      await resolveLowStockAlerts(product._id.toString())
+    } catch (alertError) {
+      console.error("[Product Alert Resolve Error]", alertError)
     }
 
     return NextResponse.json({ success: true })

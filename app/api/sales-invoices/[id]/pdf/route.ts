@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth/middleware"
 import { Invoice } from "@/lib/db/models/Invoice"
 import "@/lib/db/models/User"
 import { Sale } from "@/lib/db/models/Sale"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { generateSalesInvoicePDF } from "@/lib/pdf/invoice-generator"
 
 export const runtime = "nodejs"
@@ -26,6 +27,7 @@ export async function GET(
     await connectToDatabase()
     const invoice = mongoose.isValidObjectId(id)
       ? await Invoice.findOne({
+          ...activeRecordFilter,
           $or: [{ _id: id }, { saleId: id }],
         }).populate("createdBy", "name email")
       : null
@@ -47,7 +49,10 @@ export async function GET(
     }))
 
     if (items.length === 0 && invoice.saleId) {
-      const sale = await Sale.findById(invoice.saleId)
+      const sale = await Sale.findOne({
+        _id: invoice.saleId,
+        ...activeRecordFilter,
+      })
       items =
         sale?.items.map((item) => ({
           description: item.name,

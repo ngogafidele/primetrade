@@ -28,12 +28,12 @@ type StatsResponse = {
   salesCount: number
   revenue: number
   salesToday: number
-  stockValue: number
+  stockValue?: number
   revenueToday: number
-  costOfSalesToday: number
-  grossProfitToday: number
+  costOfSalesToday?: number
+  grossProfitToday?: number
   expensesToday: number
-  returnCostToday: number
+  returnCostToday?: number
   lowStockProducts: Array<{
     _id: string
     name: string
@@ -84,8 +84,14 @@ export function DashboardStats() {
     return <p className="text-sm text-muted-foreground">No stats available.</p>
   }
 
-  const profitToday =
-    stats.grossProfitToday - stats.expensesToday + stats.returnCostToday
+  const canSeeCostMetrics =
+    stats.stockValue !== undefined &&
+    stats.costOfSalesToday !== undefined &&
+    stats.grossProfitToday !== undefined &&
+    stats.returnCostToday !== undefined
+  const profitToday = canSeeCostMetrics
+    ? stats.grossProfitToday! - stats.expensesToday + stats.returnCostToday!
+    : 0
   const cardClass =
     "rounded-2xl border border-border/80 bg-[#BFDBFE] p-4 text-black shadow-sm"
   const warningCardClass =
@@ -93,34 +99,46 @@ export function DashboardStats() {
 
   const cards = [
     { label: "Products", value: stats.productCount, icon: Boxes },
-    {
-      label: "Total Stock Value",
-      value: formatCurrency(stats.stockValue),
-      icon: Warehouse,
-    },
+    ...(canSeeCostMetrics
+      ? [
+          {
+            label: "Total Stock Value",
+            value: formatCurrency(stats.stockValue!),
+            icon: Warehouse,
+          },
+        ]
+      : []),
     { label: "Sales Today", value: stats.salesToday, icon: ReceiptText },
     {
       label: "Revenue Today",
       value: formatCurrency(stats.revenueToday),
       icon: Coins,
     },
-    {
-      label: "Cost of Sales Today",
-      value: formatCurrency(stats.costOfSalesToday),
-      icon: Wallet,
-    },
+    ...(canSeeCostMetrics
+      ? [
+          {
+            label: "Cost of Sales Today",
+            value: formatCurrency(stats.costOfSalesToday!),
+            icon: Wallet,
+          },
+        ]
+      : []),
     {
       label: "Expenses Today",
       value: formatCurrency(stats.expensesToday),
       icon: Scale,
       warning: stats.expensesToday > 0,
     },
-    {
-      label: "Profit Today",
-      value: formatCurrency(profitToday),
-      icon: TrendingUp,
-      warning: profitToday < 0,
-    },
+    ...(canSeeCostMetrics
+      ? [
+          {
+            label: "Profit Today",
+            value: formatCurrency(profitToday),
+            icon: TrendingUp,
+            warning: profitToday < 0,
+          },
+        ]
+      : []),
   ]
 
   return (

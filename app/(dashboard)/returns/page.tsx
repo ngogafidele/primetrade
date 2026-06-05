@@ -3,6 +3,7 @@ import { ReturnTransaction } from "@/lib/db/models/Return"
 import { Product } from "@/lib/db/models/Product"
 import "@/lib/db/models/User"
 import { requireServerSession } from "@/lib/auth/server"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { ReturnsManager } from "@/components/returns/returns-manager"
 import { formatInKigali } from "@/lib/utils/time"
 
@@ -55,7 +56,7 @@ export default async function ReturnsPage() {
     .populate("createdBy", "name email")
     .sort({ createdAt: -1 })
     .lean<ReturnPageEntry[]>()
-  const products = await Product.find()
+  const products = await Product.find(activeRecordFilter)
     .sort({ name: 1 })
     .lean<ReturnPageProduct[]>()
 

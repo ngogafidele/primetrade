@@ -2,6 +2,7 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { StockAdjustment } from "@/lib/db/models/StockAdjustment"
 import { Product } from "@/lib/db/models/Product"
 import { requireServerSession } from "@/lib/auth/server"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { redirect } from "next/navigation"
 import { StockAdjustmentsManager } from "@/components/stock-adjustments/stock-adjustments-manager"
 
@@ -34,7 +35,7 @@ export default async function StockAdjustmentsPage() {
   const adjustments = await StockAdjustment.find()
     .sort({ createdAt: -1 })
     .lean<StockAdjustmentPageAdjustment[]>()
-  const products = await Product.find()
+  const products = await Product.find(activeRecordFilter)
     .sort({ name: 1 })
     .lean<StockAdjustmentPageProduct[]>()
 

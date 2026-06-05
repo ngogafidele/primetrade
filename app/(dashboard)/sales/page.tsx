@@ -3,6 +3,7 @@ import { Sale } from "@/lib/db/models/Sale"
 import { Product } from "@/lib/db/models/Product"
 import "@/lib/db/models/User"
 import { requireServerSession } from "@/lib/auth/server"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { SalesManager } from "@/components/sales/sales-manager"
 import { formatInKigali } from "@/lib/utils/time"
 
@@ -18,7 +19,7 @@ type SalesPageSaleItem = {
   sku: string
   unit?: string
   quantity: number
-  basePrice: number
+  basePrice?: number
   sellingPrice: number
   lineTotal: number
 }
@@ -29,6 +30,9 @@ type SalesPageSale = {
   createdAt?: Date
   updatedAt?: Date
   createdBy?: PopulatedSaleUser | { toString(): string }
+  deletedAt?: Date
+  deletedBy?: PopulatedSaleUser | { toString(): string }
+  deletedReason?: string
   totalAmount: number
   approvalStatus?: "pending" | "approved"
   paymentStatus: "paid" | "unpaid"
@@ -52,7 +56,7 @@ type SalesPageProduct = {
   sku: string
   unit?: string
   quantity: number
-  costPrice: number
+  costPrice?: number
   price: number
 }
 
@@ -70,15 +74,22 @@ export default async function SalesPage() {
   const session = await requireServerSession()
 
   await connectToDatabase()
-  const sales = await Sale.find()
-    .populate("createdBy", "name email")
-    .sort({ saleDate: -1, createdAt: -1 })
-    .lean<SalesPageSale[]>()
-  const products = await Product.find()
+  const [sales, deletedSales] = await Promise.all([
+    Sale.find(activeRecordFilter)
+      .populate("createdBy", "name email")
+      .sort({ saleDate: -1, createdAt: -1 })
+      .lean<SalesPageSale[]>(),
+    Sale.find({ deletedAt: { $type: "date" } })
+      .populate("createdBy", "name email")
+      .populate("deletedBy", "name email")
+      .sort({ deletedAt: -1 })
+      .lean<SalesPageSale[]>(),
+  ])
+  const products = await Product.find(activeRecordFilter)
     .sort({ name: 1 })
     .lean<SalesPageProduct[]>()
 
-  const serializedSales = sales.map((sale) => {
+  const serializeSale = (sale: SalesPageSale) => {
     const displayDate = sale.saleDate ?? sale.createdAt
 
     return {
@@ -89,7 +100,7 @@ export default async function SalesPage() {
         sku: item.sku,
         unit: item.unit ?? "pcs",
         quantity: item.quantity,
-        basePrice: item.basePrice,
+        ...(session.isAdmin ? { basePrice: item.basePrice } : {}),
         sellingPrice: item.sellingPrice,
         lineTotal: item.lineTotal,
       })),
@@ -119,6 +130,20 @@ export default async function SalesPage() {
           })
         : "-",
       updatedAt: sale.updatedAt?.toISOString(),
+      deletedAt: sale.deletedAt?.toISOString(),
+      deletedAtLabel: sale.deletedAt
+        ? formatInKigali(sale.deletedAt, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : undefined,
+      deletedReason: sale.deletedReason ?? "",
+      deletedByName: isPopulatedSaleUser(sale.deletedBy)
+        ? sale.deletedBy.name ?? sale.deletedBy.email ?? "Unknown User"
+        : undefined,
       customer: sale.customer
         ? {
             customerName: sale.customer.customerName ?? "",
@@ -139,7 +164,10 @@ export default async function SalesPage() {
         ? sale.createdBy.name ?? sale.createdBy.email ?? "Unknown User"
         : "Unknown User",
     }
-  })
+  }
+
+  const serializedSales = sales.map(serializeSale)
+  const serializedDeletedSales = deletedSales.map(serializeSale)
 
   const serializedProducts = products.map((product) => ({
     _id: product._id.toString(),
@@ -147,13 +175,14 @@ export default async function SalesPage() {
     sku: product.sku,
     unit: product.unit ?? "pcs",
     quantity: product.quantity,
-    costPrice: product.costPrice,
+    ...(session.isAdmin ? { costPrice: product.costPrice } : {}),
     price: product.price,
   }))
 
   return (
     <SalesManager
       initialSales={serializedSales}
+      initialDeletedSales={serializedDeletedSales}
       products={serializedProducts}
       currentUserLabel={session.email}
       canApproveSales={session.isAdmin}

@@ -36,6 +36,9 @@ const InvoiceSchema = new Schema(
     },
     issuedAt: { type: Date, default: Date.now },
     dueDate: { type: Date },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    deletedReason: { type: String, default: "", trim: true },
   },
   { timestamps: true }
 )
@@ -43,6 +46,7 @@ const InvoiceSchema = new Schema(
 InvoiceSchema.index({ invoiceNumber: 1 }, { unique: true })
 InvoiceSchema.index({ saleId: 1 })
 InvoiceSchema.index({ proformaId: 1 })
+InvoiceSchema.index({ deletedAt: 1 })
 
 export type InvoiceDocument = mongoose.InferSchemaType<typeof InvoiceSchema>
 

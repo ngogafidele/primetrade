@@ -7,6 +7,8 @@ import { Sale } from "@/lib/db/models/Sale"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 import { approvedSaleFilter } from "@/lib/db/sales-approval"
+import { serializeSaleForSession } from "@/lib/db/sales-serialization"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { CreateSaleSchema } from "@/lib/db/validators/sale"
 import { parseKigaliDateInput } from "@/lib/utils/time"
 
@@ -48,7 +50,7 @@ export async function GET(
     const { id } = await context.params
 
     await connectToDatabase()
-    const sale = await Sale.findById(id)
+    const sale = await Sale.findOne({ _id: id, ...activeRecordFilter })
 
     if (!sale) {
       return NextResponse.json(
@@ -57,7 +59,10 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ success: true, data: sale })
+    return NextResponse.json({
+      success: true,
+      data: serializeSaleForSession(sale, session.isAdmin),
+    })
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch sale" },
@@ -92,7 +97,7 @@ export async function PATCH(
       const { id } = await context.params
 
       await connectToDatabase()
-      const sale = await Sale.findById(id)
+      const sale = await Sale.findOne({ _id: id, ...activeRecordFilter })
 
       if (!sale) {
         return NextResponse.json(
@@ -101,7 +106,10 @@ export async function PATCH(
         )
       }
 
-      const invoice = await Invoice.findOne({ saleId: sale._id })
+      const invoice = await Invoice.findOne({
+        saleId: sale._id,
+        ...activeRecordFilter,
+      })
       if (invoice) {
         return NextResponse.json(
           {
@@ -116,7 +124,10 @@ export async function PATCH(
       const productIds = Array.from(
         new Set(updatePayload.items.map((item) => item.productId))
       )
-      const products = await Product.find({ _id: { $in: productIds } })
+      const products = await Product.find({
+        _id: { $in: productIds },
+        ...activeRecordFilter,
+      })
 
       if (products.length !== productIds.length) {
         return NextResponse.json(
@@ -245,7 +256,10 @@ export async function PATCH(
       const touchedProductIds = Array.from(netStockChanges.keys())
       const touchedProducts =
         touchedProductIds.length > 0
-          ? await Product.find({ _id: { $in: touchedProductIds } })
+          ? await Product.find({
+              _id: { $in: touchedProductIds },
+              ...activeRecordFilter,
+            })
           : []
       const touchedProductMap = new Map(
         touchedProducts.map((product) => [product._id.toString(), product])
@@ -254,7 +268,11 @@ export async function PATCH(
 
       for (const [productId, change] of netStockChanges.entries()) {
         const result = await Product.updateOne(
-          { _id: productId, ...(change < 0 ? { quantity: { $gte: -change } } : {}) },
+          {
+            _id: productId,
+            ...activeRecordFilter,
+            ...(change < 0 ? { quantity: { $gte: -change } } : {}),
+          },
           { $inc: { quantity: change } }
         )
 
@@ -335,7 +353,10 @@ export async function PATCH(
         console.error("[Low Stock Alert Sync Error]", error)
       }
 
-      return NextResponse.json({ success: true, data: sale })
+      return NextResponse.json({
+        success: true,
+        data: serializeSaleForSession(sale, session.isAdmin),
+      })
     }
 
     if (payload?.approvalStatus === "approved") {
@@ -349,7 +370,11 @@ export async function PATCH(
       const { id } = await context.params
 
       await connectToDatabase()
-      const sale = await Sale.findOne({ _id: id, approvalStatus: "pending" })
+      const sale = await Sale.findOne({
+        _id: id,
+        approvalStatus: "pending",
+        ...activeRecordFilter,
+      })
 
       if (!sale) {
         return NextResponse.json(
@@ -367,7 +392,10 @@ export async function PATCH(
       })
 
       const productIds = Array.from(requestedQuantities.keys())
-      const products = await Product.find({ _id: { $in: productIds } })
+      const products = await Product.find({
+        _id: { $in: productIds },
+        ...activeRecordFilter,
+      })
       const productMap = new Map(
         products.map((product) => [product._id.toString(), product])
       )
@@ -396,7 +424,7 @@ export async function PATCH(
 
       for (const [productId, quantity] of requestedQuantities.entries()) {
         const result = await Product.updateOne(
-          { _id: productId, quantity: { $gte: quantity } },
+          { _id: productId, ...activeRecordFilter, quantity: { $gte: quantity } },
           { $inc: { quantity: -quantity } }
         )
 
@@ -484,12 +512,15 @@ export async function PATCH(
 
       return NextResponse.json({
         success: true,
-        data: {
-          ...saleData,
-          approvalStatus: "approved",
-          approvedBy: session.userId,
-          approvedAt,
-        },
+        data: serializeSaleForSession(
+          {
+            ...saleData,
+            approvalStatus: "approved",
+            approvedBy: session.userId,
+            approvedAt,
+          },
+          session.isAdmin
+        ),
       })
     }
 
@@ -528,7 +559,10 @@ export async function PATCH(
     })
     await sale.save()
 
-    return NextResponse.json({ success: true, data: sale })
+    return NextResponse.json({
+      success: true,
+      data: serializeSaleForSession(sale, session.isAdmin),
+    })
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to update sale" },
@@ -551,9 +585,19 @@ export async function DELETE(
     }
 
     const { id } = await context.params
+    const payload = await request.json().catch(() => null)
+    const deletionReason =
+      typeof payload?.reason === "string" ? payload.reason.trim() : ""
+
+    if (!deletionReason) {
+      return NextResponse.json(
+        { success: false, error: "Deletion reason is required" },
+        { status: 400 }
+      )
+    }
 
     await connectToDatabase()
-    const sale = await Sale.findById(id)
+    const sale = await Sale.findOne({ _id: id, ...activeRecordFilter })
 
     if (!sale) {
       return NextResponse.json(
@@ -585,27 +629,42 @@ export async function DELETE(
       )
     }
 
-    const proformasToRestore = await Proforma.find({ saleId: sale._id }).lean()
-    const proformaIds = proformasToRestore.map((proforma) => proforma._id)
+    const proformas = await Proforma.find({ saleId: sale._id }).lean()
+    const proformaIds = proformas.map((proforma) => proforma._id)
     const invoiceEffectFilter =
       proformaIds.length > 0
         ? {
-            $or: [
-              { saleId: sale._id },
-              { proformaId: { $in: proformaIds } },
-            ],
+            ...activeRecordFilter,
+            $or: [{ saleId: sale._id }, { proformaId: { $in: proformaIds } }],
           }
-        : { saleId: sale._id }
-    const invoicesToRestore = await Invoice.find(invoiceEffectFilter).lean()
-    let invoicesDeleted = false
-    let proformasDeleted = false
+        : { saleId: sale._id, ...activeRecordFilter }
+
+    const deletedAt = new Date()
+    let invoicesSoftDeleted = false
 
     try {
-      await Invoice.deleteMany(invoiceEffectFilter)
-      invoicesDeleted = true
-      await Proforma.deleteMany({ saleId: sale._id })
-      proformasDeleted = true
-      await sale.deleteOne()
+      await Invoice.updateMany(invoiceEffectFilter, {
+        $set: {
+          deletedAt,
+          deletedBy: session.userId,
+          deletedReason: "sale_deleted",
+        },
+      })
+      invoicesSoftDeleted = true
+      const saleSoftDeleteResult = await Sale.updateOne(
+        { _id: sale._id, ...activeRecordFilter },
+        {
+          $set: {
+            deletedAt,
+            deletedBy: session.userId,
+            deletedReason: deletionReason,
+          },
+        }
+      )
+
+      if (saleSoftDeleteResult.modifiedCount !== 1) {
+        throw new Error("Failed to mark sale as deleted")
+      }
     } catch (error) {
       if (shouldRestock && saleItems.length > 0) {
         await Product.bulkWrite(
@@ -617,19 +676,16 @@ export async function DELETE(
           }))
         )
       }
-      if (proformasDeleted && proformasToRestore.length > 0) {
-        await Proforma.insertMany(proformasToRestore, {
-          ordered: false,
-        }).catch((restoreError) => {
-          console.error("[Proforma Restore Error]", restoreError)
-        })
-      }
-      if (invoicesDeleted && invoicesToRestore.length > 0) {
-        await Invoice.insertMany(invoicesToRestore, { ordered: false }).catch(
-          (restoreError) => {
-            console.error("[Invoice Restore Error]", restoreError)
+      if (invoicesSoftDeleted) {
+        await Invoice.updateMany(
+          { ...invoiceEffectFilter, deletedAt },
+          {
+            $set: { deletedAt: null },
+            $unset: { deletedBy: "", deletedReason: "" },
           }
-        )
+        ).catch((restoreError) => {
+          console.error("[Invoice Soft Delete Restore Error]", restoreError)
+        })
       }
       throw error
     }

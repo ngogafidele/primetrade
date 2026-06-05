@@ -13,14 +13,31 @@ const ProductSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Category",
     },
+    deletedAt: { type: Date, default: null },
+    deletedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    deletedReason: { type: String, trim: true, default: "" },
   },
   { timestamps: true }
 )
 
-ProductSchema.index({ sku: 1 }, { unique: true })
+ProductSchema.index(
+  { sku: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { deletedAt: null },
+  }
+)
+ProductSchema.index({ deletedAt: 1 })
 ProductSchema.index(
   { name: 1 },
-  { unique: true, collation: { locale: "en", strength: 2 } }
+  {
+    unique: true,
+    collation: { locale: "en", strength: 2 },
+    partialFilterExpression: { deletedAt: null },
+  }
 )
 
 export type ProductDocument = mongoose.InferSchemaType<typeof ProductSchema>

@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
 import { UpdateInvoiceSchema } from "@/lib/db/validators/invoice"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 
 export async function GET(
   request: NextRequest,
@@ -20,7 +21,7 @@ export async function GET(
     const { id } = await context.params
 
     await connectToDatabase()
-    const invoice = await Invoice.findById(id)
+    const invoice = await Invoice.findOne({ _id: id, ...activeRecordFilter })
 
     if (!invoice) {
       return NextResponse.json(
@@ -71,7 +72,7 @@ export async function PUT(
 
     await connectToDatabase()
     const invoice = await Invoice.findOneAndUpdate(
-      { _id: id },
+      { _id: id, ...activeRecordFilter },
       updateInput,
       { returnDocument: "after", runValidators: true }
     )
@@ -108,7 +109,15 @@ export async function DELETE(
     const { id } = await context.params
 
     await connectToDatabase()
-    const invoice = await Invoice.findOneAndDelete({ _id: id })
+    const invoice = await Invoice.findOneAndUpdate(
+      { _id: id, ...activeRecordFilter },
+      {
+        deletedAt: new Date(),
+        deletedBy: session.userId,
+        deletedReason: "invoice_deleted",
+      },
+      { returnDocument: "after" }
+    )
 
     if (!invoice) {
       return NextResponse.json(

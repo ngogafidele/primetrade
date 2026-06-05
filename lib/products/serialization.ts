@@ -7,12 +7,16 @@ export type ProductSerializable = {
   unit?: string
   quantity: number
   lowStockThreshold?: number
-  costPrice: number
+  costPrice?: number
   price: number
   supplierName?: string
   lastRestockAt?: DateLike
   createdAt?: DateLike
   updatedAt?: DateLike
+}
+
+type SerializeProductOptions = {
+  includeCostPrice?: boolean
 }
 
 export type ProductSupplySerializable = {
@@ -38,21 +42,27 @@ function serializeId(value: unknown) {
   return value?.toString() ?? ""
 }
 
-export function serializeProduct(product: ProductSerializable) {
-  return {
+export function serializeProduct(
+  product: ProductSerializable,
+  options: SerializeProductOptions = {}
+) {
+  const serialized = {
     _id: serializeId(product._id),
     name: product.name,
     sku: product.sku,
     unit: product.unit ?? "pcs",
     quantity: product.quantity,
     lowStockThreshold: product.lowStockThreshold ?? 0,
-    costPrice: product.costPrice,
     price: product.price,
     supplierName: product.supplierName ?? "",
     lastRestockAt: serializeDate(product.lastRestockAt),
     createdAt: serializeDate(product.createdAt),
     updatedAt: serializeDate(product.updatedAt),
   }
+
+  return options.includeCostPrice
+    ? { ...serialized, costPrice: product.costPrice ?? 0 }
+    : serialized
 }
 
 export function serializeProductSupply(supply: ProductSupplySerializable) {

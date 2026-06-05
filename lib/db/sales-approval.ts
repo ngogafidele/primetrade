@@ -1,4 +1,5 @@
 export const approvedSaleFilter = {
+  deletedAt: null,
   $or: [{ approvalStatus: "approved" }, { approvalStatus: { $exists: false } }],
 }
 

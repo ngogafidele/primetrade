@@ -31,16 +31,22 @@ type ProductClient = {
   unit: string
   quantity: number
   lowStockThreshold: number
-  costPrice: number
+  costPrice?: number
   price: number
   supplierName?: string
   lastRestockAt?: string
+  deletedAt?: string
+  deletedAtLabel?: string
+  deletedReason?: string
+  deletedByName?: string
   createdAt?: string
   updatedAt?: string
 }
 
 export type ProductsManagerProps = {
   initialProducts: ProductClient[]
+  initialDeletedProducts?: ProductClient[]
+  currentUserLabel?: string
   isAdmin: boolean
 }
 
@@ -103,10 +109,13 @@ function formatProductDate(value: string | undefined) {
 
 export function ProductsManager({
   initialProducts,
+  initialDeletedProducts = [],
+  currentUserLabel,
   isAdmin,
 }: ProductsManagerProps) {
   const router = useRouter()
   const [products, setProducts] = useState(initialProducts)
+  const [deletedProducts, setDeletedProducts] = useState(initialDeletedProducts)
   const [search, setSearch] = useState("")
   const [formState, setFormState] = useState<FormState>(() => createEmptyForm())
   const [createForms, setCreateForms] = useState<FormState[]>(() => [
@@ -129,6 +138,7 @@ export function ProductsManager({
   const costValue = Number(formState.costPrice)
   const priceValue = Number(formState.price)
   const showPriceWarning =
+    isAdmin &&
     formState.costPrice.trim() !== "" &&
     formState.price.trim() !== "" &&
     Number.isFinite(costValue) &&
@@ -415,9 +425,29 @@ export function ProductsManager({
         return
       }
 
+      const deletedAt = new Date().toISOString()
+      const deletedProduct = products.find((product) => product._id === productId)
       setProducts((current) =>
         current.filter((product) => product._id !== productId)
       )
+      if (deletedProduct) {
+        setDeletedProducts((current) => [
+          {
+            ...deletedProduct,
+            deletedAt,
+            deletedAtLabel: formatInKigali(deletedAt, {
+              year: "numeric",
+              month: "short",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            deletedReason: "product_deleted",
+            deletedByName: currentUserLabel,
+          },
+          ...current,
+        ])
+      }
       router.refresh()
     } catch (err) {
       setError("Failed to delete product.")
@@ -460,10 +490,12 @@ export function ProductsManager({
           <h2 className="text-2xl font-semibold">Products</h2>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={produceCatalogPdf}>
-            <FileText className="size-4" />
-            Catalog PDF
-          </Button>
+          {isAdmin ? (
+            <Button variant="outline" onClick={produceCatalogPdf}>
+              <FileText className="size-4" />
+              Catalog PDF
+            </Button>
+          ) : null}
           {isAdmin ? (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
@@ -885,7 +917,7 @@ export function ProductsManager({
             <TableHead>Last Restock</TableHead>
             <TableHead>Supplier</TableHead>
             <TableHead>Low Stock Threshold</TableHead>
-            <TableHead>Cost Price</TableHead>
+            {isAdmin ? <TableHead>Cost Price</TableHead> : null}
             <TableHead>Selling Price</TableHead>
             {isAdmin ? <TableHead className="text-right">Actions</TableHead> : null}
           </TableRow>
@@ -894,7 +926,7 @@ export function ProductsManager({
           {paginatedProducts.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={isAdmin ? 11 : 10}
+                colSpan={isAdmin ? 11 : 9}
                 className="text-muted-foreground"
               >
                 No products found.
@@ -905,7 +937,7 @@ export function ProductsManager({
               <TableRow
                 key={product._id.toString()}
                 className={
-                  product.price < (product.costPrice ?? 0)
+                  isAdmin && product.price < (product.costPrice ?? 0)
                     ? "bg-amber-50 hover:bg-amber-100/80"
                     : undefined
                 }
@@ -927,11 +959,13 @@ export function ProductsManager({
                 <TableCell>{formatProductDate(product.lastRestockAt)}</TableCell>
                 <TableCell>{product.supplierName || "-"}</TableCell>
                 <TableCell>{product.lowStockThreshold ?? 0}</TableCell>
-                <TableCell>{formatCurrency(product.costPrice ?? 0)}</TableCell>
+                {isAdmin ? (
+                  <TableCell>{formatCurrency(product.costPrice ?? 0)}</TableCell>
+                ) : null}
                 <TableCell>
                   <div className="flex flex-wrap items-center gap-2">
                     <span>{formatCurrency(product.price)}</span>
-                    {product.price < (product.costPrice ?? 0) ? (
+                    {isAdmin && product.price < (product.costPrice ?? 0) ? (
                       <span
                         className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
                         title="Selling price is lower than cost price and requires admin attention"
@@ -1006,6 +1040,54 @@ export function ProductsManager({
           </Button>
         </div>
       </div>
+      {isAdmin ? (
+        <section className="space-y-3 border-t border-border/80 pt-5">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Deleted Catalog
+            </p>
+            <h3 className="text-xl font-semibold">Deleted Products</h3>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Deleted</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>SKU</TableHead>
+                <TableHead>Quantity</TableHead>
+                <TableHead>Unit</TableHead>
+                <TableHead>Selling Price</TableHead>
+                <TableHead>Deleted By</TableHead>
+                <TableHead>Reason</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {deletedProducts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-muted-foreground">
+                    No deleted products.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                deletedProducts.map((product) => (
+                  <TableRow key={product._id}>
+                    <TableCell>
+                      {product.deletedAtLabel ?? formatProductDate(product.deletedAt)}
+                    </TableCell>
+                    <TableCell>{product.name}</TableCell>
+                    <TableCell>{product.sku}</TableCell>
+                    <TableCell>{product.quantity}</TableCell>
+                    <TableCell>{product.unit ?? "pcs"}</TableCell>
+                    <TableCell>{formatCurrency(product.price)}</TableCell>
+                    <TableCell>{product.deletedByName || "-"}</TableCell>
+                    <TableCell>{product.deletedReason || "-"}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </section>
+      ) : null}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
   isDuplicateKeyError,
   productNameExists,
 } from "@/lib/db/products"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { parseKigaliDateInput } from "@/lib/utils/time"
 import {
   serializeProduct,
@@ -35,7 +36,10 @@ function getSkuPrefix(name: string) {
 async function generateProductSku(name: string) {
   const prefix = getSkuPrefix(name)
   const skuPattern = `^${prefix}-\\d{4}$`
-  const latestProduct = await Product.findOne({ sku: { $regex: skuPattern } })
+  const latestProduct = await Product.findOne({
+    sku: { $regex: skuPattern },
+    ...activeRecordFilter,
+  })
     .sort({ sku: -1 })
     .select("sku")
     .lean<{ sku?: string }>()
@@ -45,7 +49,7 @@ async function generateProductSku(name: string) {
 
   for (let sequence = latestSequence + 1; sequence <= 9999; sequence += 1) {
     const sku = `${prefix}-${String(sequence).padStart(4, "0")}`
-    const existing = await Product.exists({ sku })
+    const existing = await Product.exists({ sku, ...activeRecordFilter })
     if (!existing) return sku
   }
 
@@ -64,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase()
     const [products, latestSupplies] = await Promise.all([
-      Product.find().lean(),
+      Product.find(activeRecordFilter).lean(),
       ProductSupply.aggregate<LatestProductSupply>([
         { $sort: { suppliedAt: -1, createdAt: -1 } },
         {
@@ -88,7 +92,7 @@ export async function GET(request: NextRequest) {
           ...product,
           supplierName: latestSupply?.supplierName,
           lastRestockAt: latestSupply?.suppliedAt,
-        })
+        }, { includeCostPrice: session.isAdmin })
       }),
     })
   } catch (error) {
@@ -101,6 +105,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const createdProductIds: string[] = []
+  let actorUserId: string | undefined
 
   try {
     const { authorized, session } = await requireAdmin(request)
@@ -110,6 +115,7 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       )
     }
+    actorUserId = session.userId
 
     const body = await request.json()
     const isBatchRequest =
@@ -189,7 +195,7 @@ export async function POST(request: NextRequest) {
           ...product.toObject(),
           supplierName: supply?.supplierName,
           lastRestockAt: supply?.suppliedAt,
-        }),
+        }, { includeCostPrice: true }),
         supply: supply ? serializeProductSupply(supply) : null,
       })
     }
@@ -211,7 +217,16 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (createdProductIds.length > 0) {
       await Promise.all([
-        Product.deleteMany({ _id: { $in: createdProductIds } }),
+        Product.updateMany(
+          { _id: { $in: createdProductIds }, ...activeRecordFilter },
+          {
+            $set: {
+              deletedAt: new Date(),
+              deletedBy: actorUserId,
+              deletedReason: "product_creation_failed",
+            },
+          }
+        ),
         ProductSupply.deleteMany({ productId: { $in: createdProductIds } }),
         Alert.deleteMany({ productId: { $in: createdProductIds } }),
       ])

@@ -58,9 +58,14 @@ const SaleSchema = new Schema(
     notes: { type: String, default: "" },
     customer: { type: SaleCustomerSchema, default: undefined },
     outstanding: { type: OutstandingDetailsSchema, default: undefined },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    deletedReason: { type: String, default: "", trim: true },
   },
   { timestamps: true }
 )
+
+SaleSchema.index({ deletedAt: 1 }, { expireAfterSeconds: 60 * 24 * 60 * 60 })
 
 export type SaleDocument = mongoose.InferSchemaType<typeof SaleSchema>
 

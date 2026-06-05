@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/middleware"
 import { connectToDatabase } from "@/lib/db/connection"
 import { Sale } from "@/lib/db/models/Sale"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import "@/lib/db/models/User"
 import { generateSalesListPDF } from "@/lib/pdf/sales-list-generator"
 import {
@@ -85,6 +86,7 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase()
     const sales = await Sale.find({
+      ...activeRecordFilter,
       $or: [
         { saleDate: dateFilter },
         { saleDate: { $exists: false }, createdAt: dateFilter },

@@ -28,3 +28,10 @@ export async function syncLowStockAlert(params: {
     { isResolved: true, resolvedAt: new Date() }
   )
 }
+
+export async function resolveLowStockAlerts(productId: string) {
+  await Alert.updateMany(
+    { productId, type: "low-stock", isResolved: false },
+    { isResolved: true, resolvedAt: new Date() }
+  )
+}

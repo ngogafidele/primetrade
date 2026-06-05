@@ -5,6 +5,7 @@ import { StockAdjustment } from "@/lib/db/models/StockAdjustment"
 import { requireAdmin } from "@/lib/auth/middleware"
 import { CreateStockAdjustmentSchema } from "@/lib/db/validators/stock-adjustment"
 import { syncLowStockAlert } from "@/lib/db/alerts"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,7 +42,10 @@ export async function POST(request: NextRequest) {
     const payload = CreateStockAdjustmentSchema.parse(await request.json())
 
     await connectToDatabase()
-    const product = await Product.findById(payload.productId)
+    const product = await Product.findOne({
+      _id: payload.productId,
+      ...activeRecordFilter,
+    })
 
     if (!product) {
       return NextResponse.json(
@@ -53,6 +57,7 @@ export async function POST(request: NextRequest) {
     const updatedProduct = await Product.findOneAndUpdate(
       {
         _id: payload.productId,
+        ...activeRecordFilter,
         quantity: { $gte: Math.max(0, -payload.quantityChange) },
       },
       { $inc: { quantity: payload.quantityChange } },

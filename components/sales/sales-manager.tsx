@@ -41,7 +41,7 @@ type ProductOption = {
   name: string
   sku: string
   unit: string
-  costPrice: number
+  costPrice?: number
   price: number
   quantity: number
 }
@@ -75,6 +75,10 @@ type SaleClient = {
   createdByName?: string
   createdAtLabel?: string
   createdAt?: string
+  deletedAt?: string
+  deletedAtLabel?: string
+  deletedByName?: string
+  deletedReason?: string
 }
 
 type InvoiceStatus = "paid" | "unpaid"
@@ -128,17 +132,20 @@ function getDownloadFilename(response: Response) {
 
 export function SalesManager({
   initialSales,
+  initialDeletedSales,
   products,
   currentUserLabel,
   canApproveSales,
 }: {
   initialSales: SaleClient[]
+  initialDeletedSales: SaleClient[]
   products: ProductOption[]
   currentUserLabel: string
   canApproveSales: boolean
 }) {
   const router = useRouter()
   const [sales, setSales] = useState(initialSales)
+  const [deletedSales, setDeletedSales] = useState(initialDeletedSales)
   const [productOptions, setProductOptions] = useState(products)
   const [draftItems, setDraftItems] = useState<DraftItem[]>([emptyDraft])
   const [saleDate, setSaleDate] = useState(() =>
@@ -162,8 +169,10 @@ export function SalesManager({
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [outstandingDialogOpen, setOutstandingDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [activeInvoiceSale, setActiveInvoiceSale] = useState<SaleClient | null>(null)
   const [activeEditSale, setActiveEditSale] = useState<SaleClient | null>(null)
+  const [activeDeleteSale, setActiveDeleteSale] = useState<SaleClient | null>(null)
   const [invoiceForm, setInvoiceForm] = useState(defaultInvoiceForm)
   const [editDraftItems, setEditDraftItems] = useState<DraftItem[]>([emptyDraft])
   const [editSaleDate, setEditSaleDate] = useState("")
@@ -181,6 +190,8 @@ export function SalesManager({
   )
   const [outstandingError, setOutstandingError] = useState<string | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
+  const [deleteReason, setDeleteReason] = useState("")
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [invoicedSaleIds, setInvoicedSaleIds] = useState<string[]>([])
   const [saleSearch, setSaleSearch] = useState("")
   const [pdfRange, setPdfRange] = useState(() => getDefaultPdfRange())
@@ -831,34 +842,68 @@ export function SalesManager({
     )
   }
 
-  const deleteSale = async (sale: SaleClient) => {
-    const shouldDelete = window.confirm(
-      "Delete this sale? Stock, reports, loans, proformas, and invoices from this sale will be reversed or removed."
-    )
-    if (!shouldDelete) return
+  const openDeleteDialog = (sale: SaleClient) => {
+    setActiveDeleteSale(sale)
+    setDeleteReason("")
+    setDeleteError(null)
+    setDeleteDialogOpen(true)
+  }
 
+  const deleteSale = async () => {
+    if (!activeDeleteSale) return
+
+    const reason = deleteReason.trim()
+    if (!reason) {
+      setDeleteError("Enter a reason before deleting this sale.")
+      return
+    }
+
+    const sale = activeDeleteSale
     setError(null)
+    setDeleteError(null)
     setDeletingId(sale._id)
 
     try {
       const response = await fetch(`/api/sales/${sale._id}`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
       })
       const body = await response.json().catch(() => null)
 
       if (!response.ok || !body?.success) {
-        setError(body?.error ?? "Failed to delete sale.")
+        setDeleteError(body?.error ?? "Failed to delete sale.")
         return
       }
 
+      const deletedAt = new Date()
       restoreDeletedSaleStock(sale)
       setSales((current) => current.filter((item) => item._id !== sale._id))
+      setDeletedSales((current) => [
+        {
+          ...sale,
+          deletedAt: deletedAt.toISOString(),
+          deletedAtLabel: formatInKigali(deletedAt, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          deletedByName: currentUserLabel,
+          deletedReason: reason,
+        },
+        ...current,
+      ])
       setInvoicedSaleIds((current) =>
         current.filter((saleId) => saleId !== sale._id)
       )
+      setDeleteDialogOpen(false)
+      setActiveDeleteSale(null)
+      setDeleteReason("")
       router.refresh()
     } catch {
-      setError("Failed to delete sale.")
+      setDeleteError("Failed to delete sale.")
     } finally {
       setDeletingId(null)
     }
@@ -889,6 +934,22 @@ export function SalesManager({
     return phone || "-"
   }
 
+  const deletedPurgeDateLabel = (sale: SaleClient) => {
+    if (!sale.deletedAt) return "-"
+
+    const deletedAt = new Date(sale.deletedAt)
+    if (Number.isNaN(deletedAt.getTime())) return "-"
+
+    const purgeDate = new Date(deletedAt)
+    purgeDate.setDate(purgeDate.getDate() + 60)
+
+    return formatInKigali(purgeDate, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+    })
+  }
+
   const invoicedSaleIdSet = useMemo(
     () => new Set(invoicedSaleIds),
     [invoicedSaleIds]
@@ -898,7 +959,12 @@ export function SalesManager({
     item: DraftItem,
     product: ProductOption | null | undefined
   ) => {
-    if (!product || item.sellingPrice.trim() === "") return false
+    if (
+      !canApproveSales ||
+      !product ||
+      product.costPrice === undefined ||
+      item.sellingPrice.trim() === ""
+    ) return false
 
     const sellingPrice = Number(item.sellingPrice)
     return Number.isFinite(sellingPrice) && sellingPrice < product.costPrice
@@ -1063,7 +1129,11 @@ export function SalesManager({
                 {selectedProduct ? (
                   <div className="md:col-span-4 space-y-1 text-xs">
                     <p className="text-muted-foreground">
-                      Cost price: {formatCurrency(selectedProduct.costPrice)} |
+                      {canApproveSales && selectedProduct.costPrice !== undefined
+                        ? `Cost price: ${formatCurrency(
+                            selectedProduct.costPrice
+                          )} | `
+                        : ""}
                       Default selling price: {formatCurrency(selectedProduct.price)} |
                       Available: {selectedProduct.quantity} {selectedProduct.unit}
                     </p>
@@ -1200,7 +1270,7 @@ export function SalesManager({
           <TableRow>
             <TableHead>Sale Date</TableHead>
             <TableHead>Items Sold</TableHead>
-            <TableHead>Cost Price</TableHead>
+            {canApproveSales ? <TableHead>Cost Price</TableHead> : null}
             <TableHead>Sold Price</TableHead>
             <TableHead>Total</TableHead>
             <TableHead>Payment</TableHead>
@@ -1215,7 +1285,10 @@ export function SalesManager({
         <TableBody>
           {paginatedSales.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={12} className="text-muted-foreground">
+              <TableCell
+                colSpan={canApproveSales ? 12 : 11}
+                className="text-muted-foreground"
+              >
                 {saleSearch.trim()
                   ? "No sales match that customer search."
                   : "No sales recorded yet."}
@@ -1242,7 +1315,9 @@ export function SalesManager({
                     <TableRow
                       key={`${sale._id}-${item.productId}-${itemIndex}`}
                       className={
-                        item.sellingPrice < (item.basePrice ?? 0)
+                        canApproveSales &&
+                        item.basePrice !== undefined &&
+                        item.sellingPrice < item.basePrice
                           ? "bg-amber-50 hover:bg-amber-100/80"
                           : undefined
                       }
@@ -1265,11 +1340,15 @@ export function SalesManager({
                           ) : null}
                         </div>
                       </TableCell>
-                      <TableCell>{formatCurrency(item.basePrice ?? 0)}</TableCell>
+                      {canApproveSales ? (
+                        <TableCell>{formatCurrency(item.basePrice ?? 0)}</TableCell>
+                      ) : null}
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-2">
                           <span>{formatCurrency(item.sellingPrice)}</span>
-                          {item.sellingPrice < (item.basePrice ?? 0) ? (
+                          {canApproveSales &&
+                          item.basePrice !== undefined &&
+                          item.sellingPrice < item.basePrice ? (
                             <span
                               className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
                               title="Selling price was lower than the cost price for this sale"
@@ -1347,7 +1426,7 @@ export function SalesManager({
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  onClick={() => deleteSale(sale)}
+                                  onClick={() => openDeleteDialog(sale)}
                                   disabled={deletingId === sale._id}
                                 >
                                   {deletingId === sale._id
@@ -1412,6 +1491,143 @@ export function SalesManager({
           </Button>
         </div>
       </div>
+
+      {canApproveSales ? (
+        <section className="space-y-3 border-t border-border/80 pt-5">
+          <div>
+            <h3 className="text-lg font-semibold">Deleted Sales</h3>
+            <p className="text-sm text-muted-foreground">
+              Deleted sales stay here temporarily and are removed from the
+              database after 60 days.
+            </p>
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Deleted</TableHead>
+                <TableHead>Sale Date</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead>Items</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Deleted By</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>Remove After</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {deletedSales.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-muted-foreground">
+                    No deleted sales.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                deletedSales.map((sale) => (
+                  <TableRow key={`deleted-${sale._id}`}>
+                    <TableCell>{sale.deletedAtLabel ?? "-"}</TableCell>
+                    <TableCell>
+                      {sale.saleDateLabel ?? sale.createdAtLabel ?? "-"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p>{customerNameLabel(sale)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {customerPhoneLabel(sale)}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="whitespace-normal wrap-break-word">
+                        {sale.items.length
+                          ? sale.items
+                              .map(
+                                (item) =>
+                                  `${getItemLabel(item)} (${item.quantity} ${
+                                    item.unit ?? "pcs"
+                                  })`
+                              )
+                              .join(", ")
+                          : "-"}
+                      </span>
+                    </TableCell>
+                    <TableCell>{formatCurrency(sale.totalAmount)}</TableCell>
+                    <TableCell>{sale.deletedByName ?? "-"}</TableCell>
+                    <TableCell>
+                      <span className="whitespace-normal wrap-break-word">
+                        {sale.deletedReason || "-"}
+                      </span>
+                    </TableCell>
+                    <TableCell>{deletedPurgeDateLabel(sale)}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </section>
+      ) : null}
+
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open)
+          if (!open) {
+            setActiveDeleteSale(null)
+            setDeleteReason("")
+            setDeleteError(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Sale</DialogTitle>
+          </DialogHeader>
+
+          {activeDeleteSale ? (
+            <div className="rounded-lg border border-border/80 bg-muted/40 p-3 text-sm">
+              <p className="font-medium">
+                {formatCurrency(activeDeleteSale.totalAmount)}
+              </p>
+              <p className="text-muted-foreground">
+                {activeDeleteSale.saleDateLabel ??
+                  activeDeleteSale.createdAtLabel ??
+                  "-"}
+              </p>
+            </div>
+          ) : null}
+
+          <label className="grid gap-1 text-sm">
+            Deletion Reason
+            <textarea
+              value={deleteReason}
+              onChange={(event) => setDeleteReason(event.target.value)}
+              className="min-h-24 rounded-md border border-border px-3 py-2"
+              placeholder="Explain why this sale is being deleted"
+            />
+          </label>
+
+          {deleteError ? (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          ) : null}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={Boolean(deletingId)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={deleteSale}
+              disabled={Boolean(deletingId)}
+            >
+              {deletingId ? "Deleting..." : "Delete Sale"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={outstandingDialogOpen}
@@ -1586,7 +1802,11 @@ export function SalesManager({
                   {selectedProduct ? (
                     <div className="md:col-span-4 space-y-1 text-xs">
                       <p className="text-muted-foreground">
-                        Cost price: {formatCurrency(selectedProduct.costPrice)} |
+                        {canApproveSales && selectedProduct.costPrice !== undefined
+                          ? `Cost price: ${formatCurrency(
+                              selectedProduct.costPrice
+                            )} | `
+                          : ""}
                         Default selling price: {formatCurrency(selectedProduct.price)} |
                         Available: {selectedProduct.quantity}{" "}
                         {selectedProduct.unit}

@@ -5,6 +5,6 @@ export type Product = {
   unit: string
   quantity: number
   lowStockThreshold: number
-  costPrice: number
+  costPrice?: number
   price: number
 }

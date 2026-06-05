@@ -4,6 +4,7 @@ import { Invoice } from "@/lib/db/models/Invoice"
 import { Sale } from "@/lib/db/models/Sale"
 import { requireAuth } from "@/lib/auth/middleware"
 import { CreateInvoiceSchema } from "@/lib/db/validators/invoice"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { generateInvoiceNumber } from "@/lib/utils/number-generator"
 
 const MAX_INVOICE_NUMBER_ATTEMPTS = 5
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     await connectToDatabase()
-    const invoices = await Invoice.find().sort({ issuedAt: -1 })
+    const invoices = await Invoice.find(activeRecordFilter).sort({ issuedAt: -1 })
 
     return NextResponse.json({ success: true, data: invoices })
   } catch (error) {
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase()
 
-    const sale = await Sale.findById(payload.saleId)
+    const sale = await Sale.findOne({ _id: payload.saleId, ...activeRecordFilter })
     if (!sale) {
       return NextResponse.json(
         { success: false, error: "Sale not found" },
@@ -68,7 +69,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const existingInvoice = await Invoice.findOne({ saleId: sale._id })
+    const existingInvoice = await Invoice.findOne({
+      saleId: sale._id,
+      ...activeRecordFilter,
+    })
     if (existingInvoice) {
       return NextResponse.json(
         { success: false, error: "Invoice already exists" },
@@ -109,6 +113,7 @@ export async function POST(request: NextRequest) {
 
         const duplicateInvoice = await Invoice.findOne({
           saleId: sale._id,
+          ...activeRecordFilter,
         })
         if (duplicateInvoice) {
           return NextResponse.json(

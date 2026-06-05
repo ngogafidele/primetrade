@@ -9,6 +9,7 @@ import { ReturnTransaction } from "@/lib/db/models/Return"
 import { Sale } from "@/lib/db/models/Sale"
 import { StockAdjustment } from "@/lib/db/models/StockAdjustment"
 import { approvedSaleDateFilter } from "@/lib/db/sales-approval"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import {
   generateReportPDF,
   type ReportPdfSummary,
@@ -155,7 +156,7 @@ export async function GET(request: NextRequest) {
       recentSales,
     ] = await Promise.all([
       Product.aggregate<ProductTotals>([
-        { $match: {} },
+        { $match: activeRecordFilter },
         {
           $group: {
             _id: null,
@@ -198,7 +199,7 @@ export async function GET(request: NextRequest) {
         },
       ]),
       Invoice.aggregate<InvoiceTotals>([
-        { $match: { issuedAt: periodFilter } },
+        { $match: { issuedAt: periodFilter, ...activeRecordFilter } },
         {
           $group: {
             _id: null,

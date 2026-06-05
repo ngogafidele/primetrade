@@ -5,6 +5,7 @@ import { ReturnTransaction } from "@/lib/db/models/Return"
 import { requireAuth } from "@/lib/auth/middleware"
 import { CreateReturnSchema } from "@/lib/db/validators/return"
 import { syncLowStockAlert } from "@/lib/db/alerts"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 
 type ProductDocumentLike = {
   _id: { toString(): string }
@@ -15,6 +16,28 @@ type ProductDocumentLike = {
   price: number
   costPrice?: number
   lowStockThreshold?: number
+}
+
+function serializeReturnForSession(
+  returnRecord: { toObject?: () => Record<string, unknown>; returnItems?: Array<Record<string, unknown>> },
+  includeCostPrice: boolean
+) {
+  const data =
+    typeof returnRecord.toObject === "function"
+      ? returnRecord.toObject()
+      : { ...returnRecord }
+
+  if (includeCostPrice || !Array.isArray(data.returnItems)) {
+    return data
+  }
+
+  return {
+    ...data,
+    returnItems: data.returnItems.map((item) => {
+      const { basePrice: _basePrice, ...safeItem } = item
+      return safeItem
+    }),
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -30,7 +53,12 @@ export async function GET(request: NextRequest) {
     await connectToDatabase()
     const returns = await ReturnTransaction.find().sort({ createdAt: -1 })
 
-    return NextResponse.json({ success: true, data: returns })
+    return NextResponse.json({
+      success: true,
+      data: returns.map((returnRecord) =>
+        serializeReturnForSession(returnRecord, session.isAdmin)
+      ),
+    })
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch returns" },
@@ -57,7 +85,10 @@ export async function POST(request: NextRequest) {
       new Set(payload.returnItems.map((item) => item.productId))
     )
 
-    const products = await Product.find({ _id: { $in: productIds } })
+    const products = await Product.find({
+      _id: { $in: productIds },
+      ...activeRecordFilter,
+    })
     if (products.length !== productIds.length) {
       return NextResponse.json(
         { success: false, error: "One or more products not found" },
@@ -114,7 +145,7 @@ export async function POST(request: NextRequest) {
       if (change === 0) continue
 
       const result = await Product.updateOne(
-        { _id: productId },
+        { _id: productId, ...activeRecordFilter },
         { $inc: { quantity: change } }
       )
 
@@ -185,7 +216,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: true, data: returnRecord },
+      {
+        success: true,
+        data: serializeReturnForSession(returnRecord, session.isAdmin),
+      },
       { status: 201 }
     )
   } catch (error) {

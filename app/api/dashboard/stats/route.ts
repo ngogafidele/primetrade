@@ -11,6 +11,7 @@ import {
   approvedSaleDateFilter,
   approvedSaleFilter,
 } from "@/lib/db/sales-approval"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { getKigaliDateParts } from "@/lib/utils/time"
 
 type DashboardSaleItem = {
@@ -92,14 +93,15 @@ export async function GET(request: NextRequest) {
       invoiceCount,
       unpaidCount,
     ] = await Promise.all([
-      Product.countDocuments(),
+      Product.countDocuments(activeRecordFilter),
       Product.countDocuments({
+        ...activeRecordFilter,
         $expr: { $lte: ["$quantity", { $ifNull: ["$lowStockThreshold", 0] }] },
       }),
       Sale.countDocuments(approvedSaleFilter),
       Sale.countDocuments(todayFilter),
-      Invoice.countDocuments(),
-      Invoice.countDocuments({ status: "unpaid" }),
+      Invoice.countDocuments(activeRecordFilter),
+      Invoice.countDocuments({ status: "unpaid", ...activeRecordFilter }),
     ])
 
     const sales = await Sale.aggregate<DashboardMoneyTotal>([
@@ -113,7 +115,7 @@ export async function GET(request: NextRequest) {
     ])
 
     const stockValue = await Product.aggregate<DashboardMoneyTotal>([
-      { $match: {} },
+      { $match: activeRecordFilter },
       {
         $group: {
           _id: null,
@@ -130,7 +132,7 @@ export async function GET(request: NextRequest) {
     ])
 
     const unpaidTotals = await Invoice.aggregate<DashboardMoneyTotal>([
-      { $match: { status: "unpaid" } },
+      { $match: { status: "unpaid", ...activeRecordFilter } },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ])
 
@@ -230,6 +232,7 @@ export async function GET(request: NextRequest) {
     ])
 
     const lowStockProducts = await Product.find({
+      ...activeRecordFilter,
       $expr: { $lte: ["$quantity", { $ifNull: ["$lowStockThreshold", 0] }] },
     })
       .select("name sku quantity unit lowStockThreshold")
@@ -314,17 +317,23 @@ export async function GET(request: NextRequest) {
         salesToday,
         invoiceCount,
         unpaidCount,
-        stockValue: stockValue[0]?.total || 0,
+        ...(session.isAdmin
+          ? { stockValue: stockValue[0]?.total || 0 }
+          : {}),
         revenue: (sales[0]?.total || 0) - (allReturnTotals[0]?.total || 0),
         revenueToday:
           (todaySalesTotals[0]?.revenue || 0) -
           (todayReturnTotals[0]?.revenue || 0),
-        costOfSalesToday,
-        grossProfitToday:
-          (todayGrossProfit[0]?.total || 0) -
-          (todayReturnTotals[0]?.grossProfit || 0),
+        ...(session.isAdmin
+          ? {
+              costOfSalesToday,
+              grossProfitToday:
+                (todayGrossProfit[0]?.total || 0) -
+                (todayReturnTotals[0]?.grossProfit || 0),
+            }
+          : {}),
         expensesToday: todayExpenses[0]?.total || 0,
-        returnCostToday,
+        ...(session.isAdmin ? { returnCostToday } : {}),
         outstandingAmount: unpaidTotals[0]?.total || 0,
         lowStockProducts: lowStockProducts.map((product) => ({
           _id: product._id.toString(),

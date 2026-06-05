@@ -1,4 +1,5 @@
 import { Product } from "@/lib/db/models/Product"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -26,6 +27,7 @@ export async function productNameExists(name: string, exceptProductId?: string) 
   const normalizedName = name.trim()
   const query = {
     name: { $regex: `^${escapeRegex(normalizedName)}$`, $options: "i" },
+    ...activeRecordFilter,
     ...(exceptProductId ? { _id: { $ne: exceptProductId } } : {}),
   }
 

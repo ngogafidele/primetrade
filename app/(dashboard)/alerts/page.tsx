@@ -1,6 +1,7 @@
 import { connectToDatabase } from "@/lib/db/connection"
 import { Product } from "@/lib/db/models/Product"
 import { requireServerSession } from "@/lib/auth/server"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import {
   Table,
   TableBody,
@@ -24,6 +25,7 @@ export default async function AlertsPage() {
 
   await connectToDatabase()
   const lowStockProducts = await Product.find({
+    ...activeRecordFilter,
     $expr: { $lte: ["$quantity", { $ifNull: ["$lowStockThreshold", 0] }] },
   })
     .sort({ quantity: 1, name: 1 })

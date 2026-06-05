@@ -6,6 +6,7 @@ import { ProductSupply } from "@/lib/db/models/ProductSupply"
 import { requireAdmin } from "@/lib/auth/middleware"
 import { CreateProductSupplySchema } from "@/lib/db/validators/product-supply"
 import { syncLowStockAlert } from "@/lib/db/alerts"
+import { activeRecordFilter } from "@/lib/db/soft-delete"
 import { parseKigaliDateInput } from "@/lib/utils/time"
 import {
   serializeProduct,
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase()
     const updatedProduct = await Product.findOneAndUpdate(
-      { _id: payload.productId },
+      { _id: payload.productId, ...activeRecordFilter },
       {
         $inc: { quantity: payload.quantity },
         $set: { costPrice: payload.unitCost },
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
             ...updatedProduct.toObject(),
             supplierName: supply.supplierName,
             lastRestockAt: supply.suppliedAt,
-          }),
+          }, { includeCostPrice: true }),
         },
       },
       { status: 201 }
