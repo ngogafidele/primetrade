@@ -58,7 +58,12 @@ export default async function AlertsPage() {
             </TableRow>
           ) : (
             lowStockProducts.map((product) => (
-              <TableRow key={product._id.toString()}>
+              <TableRow
+                key={product._id.toString()}
+                className={
+                  product.quantity < 0 ? "bg-red-50 hover:bg-red-100/80" : undefined
+                }
+              >
                 <TableCell>{product.name}</TableCell>
                 <TableCell>{product.sku}</TableCell>
                 <TableCell>
@@ -68,7 +73,11 @@ export default async function AlertsPage() {
                   {product.lowStockThreshold ?? 0} {product.unit ?? "pcs"}
                 </TableCell>
                 <TableCell>
-                  {product.quantity === 0 ? "Out of Stock" : "Low Stock"}
+                  {product.quantity < 0
+                    ? "Negative Stock"
+                    : product.quantity === 0
+                      ? "Out of Stock"
+                      : "Low Stock"}
                 </TableCell>
               </TableRow>
             ))

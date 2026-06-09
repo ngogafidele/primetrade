@@ -541,7 +541,6 @@ export function ProductsManager({
                         Quantity
                         <Input
                           type="number"
-                          min={0}
                           value={formState.quantity}
                           onChange={(event) =>
                             setFormState((prev) => ({
@@ -661,7 +660,6 @@ export function ProductsManager({
                                 Quantity
                                 <Input
                                   type="number"
-                                  min={0}
                                   value={form.quantity}
                                   onChange={(event) =>
                                     updateCreateForm(index, "quantity", event.target.value)
@@ -937,9 +935,11 @@ export function ProductsManager({
               <TableRow
                 key={product._id.toString()}
                 className={
-                  isAdmin && product.price < (product.costPrice ?? 0)
-                    ? "bg-amber-50 hover:bg-amber-100/80"
-                    : undefined
+                  product.quantity < 0
+                    ? "bg-red-50 hover:bg-red-100/80"
+                    : isAdmin && product.price < (product.costPrice ?? 0)
+                      ? "bg-amber-50 hover:bg-amber-100/80"
+                      : undefined
                 }
               >
                 <TableCell>{product.name}</TableCell>
@@ -947,7 +947,11 @@ export function ProductsManager({
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <span>{product.quantity}</span>
-                    {product.quantity <= (product.lowStockThreshold ?? 0) ? (
+                    {product.quantity < 0 ? (
+                      <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                        Negative stock
+                      </span>
+                    ) : product.quantity <= (product.lowStockThreshold ?? 0) ? (
                       <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
                         Low
                       </span>

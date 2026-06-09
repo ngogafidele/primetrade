@@ -80,13 +80,10 @@ export async function POST(request: NextRequest) {
       requestedQuantities.set(item.productId, current + item.quantity)
     })
 
-    for (const [productId, quantity] of requestedQuantities.entries()) {
+    for (const productId of requestedQuantities.keys()) {
       const product = productMap.get(productId)
       if (!product) {
         throw new Error("Product not found")
-      }
-      if (product.quantity < quantity) {
-        throw new Error(`Insufficient stock for ${product.name}`)
       }
     }
 
@@ -131,7 +128,7 @@ export async function POST(request: NextRequest) {
     if (shouldApproveImmediately) {
       for (const [productId, quantity] of requestedQuantities.entries()) {
         const result = await Product.updateOne(
-          { _id: productId, ...activeRecordFilter, quantity: { $gte: quantity } },
+          { _id: productId, ...activeRecordFilter },
           { $inc: { quantity: -quantity } }
         )
 
@@ -150,7 +147,7 @@ export async function POST(request: NextRequest) {
           const product = productMap.get(productId)
           throw new Error(
             product
-              ? `Insufficient stock for ${product.name}`
+              ? `Unable to update stock for ${product.name}`
               : "One or more products not found"
           )
         }

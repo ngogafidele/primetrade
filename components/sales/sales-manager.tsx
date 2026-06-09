@@ -409,15 +409,6 @@ export function SalesManager({
     return item.name?.trim() || item.sku?.trim() || "Unnamed item"
   }
 
-  const getSaleQuantityMap = (sale: SaleClient | null) => {
-    const quantities = new Map<string, number>()
-    sale?.items.forEach((item) => {
-      const current = quantities.get(item.productId) ?? 0
-      quantities.set(item.productId, current + item.quantity)
-    })
-    return quantities
-  }
-
   const formatSaleDateLabel = (value?: string) => {
     if (!value) return "-"
     const date = parseKigaliDateInput(value) ?? new Date(value)
@@ -455,8 +446,7 @@ export function SalesManager({
 
   const validateDraftItems = (
     items: DraftItem[],
-    setMessage: (message: string) => void,
-    existingSale: SaleClient | null = null
+    setMessage: (message: string) => void
   ) => {
     const payloadItems = items.map((item) => ({
       productId: item.productId,
@@ -488,19 +478,10 @@ export function SalesManager({
       requestedByProduct.set(item.productId, current + item.quantity)
     }
 
-    for (const [productId, totalRequested] of requestedByProduct.entries()) {
+    for (const productId of requestedByProduct.keys()) {
       const product = productMap.get(productId)
       if (!product) {
         setMessage("One selected product is no longer available.")
-        return null
-      }
-      const existingQuantities = getSaleQuantityMap(existingSale)
-      const reusableQuantity =
-        (existingSale?.approvalStatus ?? "approved") === "approved"
-          ? existingQuantities.get(productId) ?? 0
-          : 0
-      if (totalRequested > product.quantity + reusableQuantity) {
-        setMessage(`Insufficient stock for ${product.name}.`)
         return null
       }
     }
@@ -681,11 +662,7 @@ export function SalesManager({
     if (!activeEditSale) return
 
     setEditError(null)
-    const payloadItems = validateDraftItems(
-      editDraftItems,
-      setEditError,
-      activeEditSale
-    )
+    const payloadItems = validateDraftItems(editDraftItems, setEditError)
     if (!payloadItems) return
     const payloadSaleDate = validateSaleDate(editSaleDate, setEditError)
     if (!payloadSaleDate) return
@@ -1137,6 +1114,11 @@ export function SalesManager({
                       Default selling price: {formatCurrency(selectedProduct.price)} |
                       Available: {selectedProduct.quantity} {selectedProduct.unit}
                     </p>
+                    {selectedProduct.quantity < 0 ? (
+                      <p className="font-medium text-red-600">
+                        Negative stock: this sale will reduce inventory further.
+                      </p>
+                    ) : null}
                     {isBelowCost ? (
                       <p className="font-medium text-amber-600">
                         Warning: selling price is lower than the cost price.
@@ -1811,6 +1793,11 @@ export function SalesManager({
                         Available: {selectedProduct.quantity}{" "}
                         {selectedProduct.unit}
                       </p>
+                      {selectedProduct.quantity < 0 ? (
+                        <p className="font-medium text-red-600">
+                          Negative stock: this sale will reduce inventory further.
+                        </p>
+                      ) : null}
                       {isBelowCost ? (
                         <p className="font-medium text-amber-600">
                           Warning: selling price is lower than the cost price.

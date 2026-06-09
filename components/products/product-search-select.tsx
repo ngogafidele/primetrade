@@ -88,7 +88,11 @@ export function ProductSearchSelect({
               <button
                 key={product._id}
                 type="button"
-                className="flex w-full flex-col rounded-md px-2 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none"
+                className={`flex w-full flex-col rounded-md px-2 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none ${
+                  product.quantity < 0
+                    ? "border border-red-200 bg-red-50 text-red-900 hover:bg-red-100 focus:bg-red-100"
+                    : ""
+                }`}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   onValueChange(product._id)
@@ -100,6 +104,11 @@ export function ProductSearchSelect({
                 <span className="text-xs text-muted-foreground">
                   {product.sku} - Stock {product.quantity} {product.unit}
                 </span>
+                {product.quantity < 0 ? (
+                  <span className="mt-1 w-fit rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                    Negative stock
+                  </span>
+                ) : null}
               </button>
             ))
           )}

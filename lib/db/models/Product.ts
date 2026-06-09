@@ -5,7 +5,7 @@ const ProductSchema = new Schema(
     name: { type: String, required: true, trim: true },
     sku: { type: String, required: true, trim: true },
     unit: { type: String, required: true, trim: true, default: "pcs" },
-    quantity: { type: Number, required: true, min: 0, default: 0 },
+    quantity: { type: Number, required: true, default: 0 },
     lowStockThreshold: { type: Number, min: 0, default: 0 },
     costPrice: { type: Number, required: true, min: 0, default: 0 },
     price: { type: Number, required: true, min: 0 },

@@ -12,8 +12,12 @@ export async function syncLowStockAlert(params: {
   const { productId, name, sku, quantity, threshold } = params
 
   if (quantity <= threshold) {
-    const severity = quantity <= Math.max(1, Math.floor(threshold * 0.3)) ? "high" : "medium"
-    const message = `Low stock: ${name} (${sku}) has ${quantity} left (threshold: ${threshold})`
+    const severity =
+      quantity <= Math.max(1, Math.floor(threshold * 0.3)) ? "high" : "medium"
+    const message =
+      quantity < 0
+        ? `Negative stock: ${name} (${sku}) is at ${quantity} (threshold: ${threshold})`
+        : `Low stock: ${name} (${sku}) has ${quantity} left (threshold: ${threshold})`
 
     await Alert.findOneAndUpdate(
       { productId, type: "low-stock", isResolved: false },

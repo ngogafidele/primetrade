@@ -5,7 +5,7 @@ export const CreateProductSchema = z
   .object({
     name: z.string().trim().min(1),
     unit: z.string().min(1),
-    quantity: z.number().int().min(0),
+    quantity: z.number().int(),
     lowStockThreshold: z.number().int().min(0).optional().default(0),
     costPrice: z.number().min(0),
     price: z.number().min(0),
@@ -15,7 +15,7 @@ export const CreateProductSchema = z
   })
   .refine(
     (value) =>
-      value.quantity === 0 || Boolean(value.supplierName?.trim().length),
+      value.quantity <= 0 || Boolean(value.supplierName?.trim().length),
     {
       message: "Supplier is required when adding stock",
       path: ["supplierName"],
@@ -33,7 +33,7 @@ export const UpdateProductSchema = z
   .object({
     name: z.string().trim().min(1).optional(),
     unit: z.string().min(1).optional(),
-    quantity: z.number().int().min(0).optional(),
+    quantity: z.number().int().optional(),
     lowStockThreshold: z.number().int().min(0).optional(),
     costPrice: z.number().min(0).optional(),
     price: z.number().min(0).optional(),

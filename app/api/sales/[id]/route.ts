@@ -152,26 +152,12 @@ export async function PATCH(
         )
       })
 
-      if (wasApproved) {
-        for (const [productId, quantity] of requestedQuantities.entries()) {
-          const product = productMap.get(productId)
-          if (!product) {
-            return NextResponse.json(
-              { success: false, error: "One or more products not found" },
-              { status: 404 }
-            )
-          }
-          const available =
-            product.quantity + (existingQuantities.get(productId) ?? 0)
-          if (quantity > available) {
-            return NextResponse.json(
-              {
-                success: false,
-                error: `Insufficient stock for ${product.name}`,
-              },
-              { status: 400 }
-            )
-          }
+      for (const productId of requestedQuantities.keys()) {
+        if (!productMap.has(productId)) {
+          return NextResponse.json(
+            { success: false, error: "One or more products not found" },
+            { status: 404 }
+          )
         }
       }
 
@@ -268,11 +254,7 @@ export async function PATCH(
 
       for (const [productId, change] of netStockChanges.entries()) {
         const result = await Product.updateOne(
-          {
-            _id: productId,
-            ...activeRecordFilter,
-            ...(change < 0 ? { quantity: { $gte: -change } } : {}),
-          },
+          { _id: productId, ...activeRecordFilter },
           { $inc: { quantity: change } }
         )
 
@@ -294,7 +276,7 @@ export async function PATCH(
             {
               success: false,
               error: product
-                ? `Insufficient stock for ${product.name}`
+                ? `Unable to update stock for ${product.name}`
                 : "One or more products not found",
             },
             { status: 400 }
@@ -400,21 +382,12 @@ export async function PATCH(
         products.map((product) => [product._id.toString(), product])
       )
 
-      for (const [productId, quantity] of requestedQuantities.entries()) {
+      for (const productId of requestedQuantities.keys()) {
         const product = productMap.get(productId)
         if (!product) {
           return NextResponse.json(
             { success: false, error: "One or more products not found" },
             { status: 404 }
-          )
-        }
-        if (product.quantity < quantity) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: `Insufficient stock for ${product.name}`,
-            },
-            { status: 400 }
           )
         }
       }
@@ -424,7 +397,7 @@ export async function PATCH(
 
       for (const [productId, quantity] of requestedQuantities.entries()) {
         const result = await Product.updateOne(
-          { _id: productId, ...activeRecordFilter, quantity: { $gte: quantity } },
+          { _id: productId, ...activeRecordFilter },
           { $inc: { quantity: -quantity } }
         )
 
@@ -445,7 +418,7 @@ export async function PATCH(
             {
               success: false,
               error: product
-                ? `Insufficient stock for ${product.name}`
+                ? `Unable to update stock for ${product.name}`
                 : "One or more products not found",
             },
             { status: 400 }
