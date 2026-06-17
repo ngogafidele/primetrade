@@ -767,6 +767,30 @@ export function SalesManager({
   const approvalStatusLabel = (status?: "pending" | "approved") =>
     status === "pending" ? "Pending" : "Approved"
 
+  const getSaleRowClass = (params: {
+    isPending: boolean
+    isUnpaid: boolean
+    isBelowCost: boolean
+  }) => {
+    if (params.isPending && params.isUnpaid) {
+      return "bg-fuchsia-50 hover:bg-fuchsia-100/80"
+    }
+
+    if (params.isPending) {
+      return "bg-sky-50 hover:bg-sky-100/80"
+    }
+
+    if (params.isUnpaid) {
+      return "bg-rose-50 hover:bg-rose-100/80"
+    }
+
+    if (params.isBelowCost) {
+      return "bg-amber-50 hover:bg-amber-100/80"
+    }
+
+    return undefined
+  }
+
   const approveSale = async (saleId: string) => {
     setError(null)
     setApprovingId(saleId)
@@ -1299,20 +1323,25 @@ export function SalesManager({
                   ]
               const rowSpan = items.length
               const isPending = (sale.approvalStatus ?? "approved") === "pending"
+              const isUnpaid = sale.paymentStatus === "unpaid"
 
               return (
                 <Fragment key={sale._id}>
-                  {items.map((item, itemIndex) => (
-                    <TableRow
-                      key={`${sale._id}-${item.productId}-${itemIndex}`}
-                      className={
-                        canApproveSales &&
-                        item.basePrice !== undefined &&
-                        item.sellingPrice < item.basePrice
-                          ? "bg-amber-50 hover:bg-amber-100/80"
-                          : undefined
-                      }
-                    >
+                  {items.map((item, itemIndex) => {
+                    const isBelowCost =
+                      canApproveSales &&
+                      item.basePrice !== undefined &&
+                      item.sellingPrice < item.basePrice
+
+                    return (
+                      <TableRow
+                        key={`${sale._id}-${item.productId}-${itemIndex}`}
+                        className={getSaleRowClass({
+                          isPending,
+                          isUnpaid,
+                          isBelowCost,
+                        })}
+                      >
                       {itemIndex === 0 ? (
                         <TableCell rowSpan={rowSpan}>
                           {sale.saleDateLabel ?? sale.createdAtLabel ?? "-"}
@@ -1337,9 +1366,7 @@ export function SalesManager({
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-2">
                           <span>{formatCurrency(item.sellingPrice)}</span>
-                          {canApproveSales &&
-                          item.basePrice !== undefined &&
-                          item.sellingPrice < item.basePrice ? (
+                          {isBelowCost ? (
                             <span
                               className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
                               title="Selling price was lower than the cost price for this sale"
@@ -1446,7 +1473,8 @@ export function SalesManager({
                         </>
                       ) : null}
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </Fragment>
               )
             })
