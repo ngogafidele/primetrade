@@ -1744,7 +1744,7 @@ export function SalesManager({
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Edit Sale</DialogTitle>
           </DialogHeader>
