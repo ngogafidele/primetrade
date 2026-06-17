@@ -52,8 +52,12 @@ function PaymentDateStatusBadge({
 
 export function OutstandingManager({
   initialSales,
+  canMarkLoansPaid,
+  canViewLoanTotals,
 }: {
   initialSales: OutstandingSaleClient[]
+  canMarkLoansPaid: boolean
+  canViewLoanTotals: boolean
 }) {
   const [sales, setSales] = useState(initialSales)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -97,6 +101,19 @@ export function OutstandingManager({
   const hasPaymentAlerts = paymentAlerts.overdue > 0 || paymentAlerts.due > 0
 
   const markPaid = async (saleId: string) => {
+    if (!canMarkLoansPaid) {
+      setError("Only admins can mark loans as paid.")
+      return
+    }
+
+    const confirmed = window.confirm(
+      "Mark this loan as paid? This will remove it from the loans list."
+    )
+
+    if (!confirmed) {
+      return
+    }
+
     setUpdatingId(saleId)
     setError(null)
 
@@ -165,12 +182,14 @@ export function OutstandingManager({
           <p className="text-sm text-muted-foreground">Matching Loans</p>
           <p className="mt-1 text-2xl font-semibold">{filteredSales.length}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Matching Amount</p>
-          <p className="mt-1 text-2xl font-semibold">
-            {formatCurrency(totalOutstanding)}
-          </p>
-        </div>
+        {canViewLoanTotals ? (
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-sm text-muted-foreground">Matching Amount</p>
+            <p className="mt-1 text-2xl font-semibold">
+              {formatCurrency(totalOutstanding)}
+            </p>
+          </div>
+        ) : null}
       </section>
 
       {hasPaymentAlerts ? (
@@ -274,15 +293,19 @@ export function OutstandingManager({
                             ? "Downloading..."
                             : "PDF"}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => markPaid(sale._id)}
-                          disabled={updatingId === sale._id}
-                        >
-                          <CheckCircle2 className="size-3.5" />
-                          {updatingId === sale._id ? "Removing..." : "Mark Paid"}
-                        </Button>
+                        {canMarkLoansPaid ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => markPaid(sale._id)}
+                            disabled={updatingId === sale._id}
+                          >
+                            <CheckCircle2 className="size-3.5" />
+                            {updatingId === sale._id
+                              ? "Removing..."
+                              : "Mark Paid"}
+                          </Button>
+                        ) : null}
                       </div>
                     </TableCell>
                   </TableRow>

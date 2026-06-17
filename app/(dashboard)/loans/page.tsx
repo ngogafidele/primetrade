@@ -33,6 +33,8 @@ type LoanSale = {
   items: LoanSaleItem[]
 }
 
+type PaymentDateStatus = "overdue" | "due" | "upcoming" | "unknown"
+
 function isPopulatedSaleUser(
   value: LoanSale["createdBy"]
 ): value is PopulatedSaleUser {
@@ -46,7 +48,7 @@ function getKigaliDateNumber(dateInput: Date | undefined) {
   return parts.year * 10000 + parts.month * 100 + parts.day
 }
 
-function getPaymentDateStatus(paymentDate: Date | undefined) {
+function getPaymentDateStatus(paymentDate: Date | undefined): PaymentDateStatus {
   const paymentDay = getKigaliDateNumber(paymentDate)
   if (!paymentDay) return "unknown"
 
@@ -59,13 +61,19 @@ function getPaymentDateStatus(paymentDate: Date | undefined) {
 }
 
 export default async function LoansPage() {
-  await requireServerSession()
+  const session = await requireServerSession()
   await connectToDatabase()
 
-  const loanSales = await Sale.find({
+  const loanFilter: Record<string, unknown> = {
     ...approvedSaleFilter,
     paymentStatus: "unpaid",
-  })
+  }
+
+  if (!session.isAdmin) {
+    loanFilter.createdBy = session.userId
+  }
+
+  const loanSales = await Sale.find(loanFilter)
     .populate("createdBy", "name email")
     .sort({ "outstanding.paymentDate": 1, createdAt: -1 })
     .lean<LoanSale[]>()
@@ -111,7 +119,11 @@ export default async function LoansPage() {
         </p>
       </div>
 
-      <OutstandingManager initialSales={serializedSales} />
+      <OutstandingManager
+        initialSales={serializedSales}
+        canMarkLoansPaid={session.isAdmin}
+        canViewLoanTotals={session.isAdmin}
+      />
     </div>
   )
 }

@@ -441,8 +441,15 @@ export function SalesManager({
     return Number.isNaN(date.getTime()) ? 0 : date.getTime()
   }
 
-  const sortSalesBySaleDate = (items: SaleClient[]) =>
-    [...items].sort((a, b) => getSaleSortTime(b) - getSaleSortTime(a))
+  const getApprovalSortRank = (sale: SaleClient) =>
+    (sale.approvalStatus ?? "approved") === "pending" ? 0 : 1
+
+  const sortSalesForList = (items: SaleClient[]) =>
+    [...items].sort((a, b) => {
+      const statusDifference = getApprovalSortRank(a) - getApprovalSortRank(b)
+      if (statusDifference !== 0) return statusDifference
+      return getSaleSortTime(b) - getSaleSortTime(a)
+    })
 
   const validateDraftItems = (
     items: DraftItem[],
@@ -545,7 +552,7 @@ export function SalesManager({
 
       const createdSale = body.data as SaleClient
       setSales((current) =>
-        sortSalesBySaleDate([
+        sortSalesForList([
           {
             ...createdSale,
             saleDate: createdSale.saleDate ?? payloadSaleDate,
@@ -723,7 +730,7 @@ export function SalesManager({
 
       const updatedSale = body.data as SaleClient
       setSales((current) =>
-        sortSalesBySaleDate(
+        sortSalesForList(
           current.map((sale) =>
             sale._id === activeEditSale._id
               ? {
@@ -778,13 +785,15 @@ export function SalesManager({
       }
 
       setSales((current) =>
-        current.map((sale) =>
-          sale._id === saleId
-            ? {
-                ...sale,
-                approvalStatus: "approved",
-              }
-            : sale
+        sortSalesForList(
+          current.map((sale) =>
+            sale._id === saleId
+              ? {
+                  ...sale,
+                  approvalStatus: "approved",
+                }
+              : sale
+          )
         )
       )
       router.refresh()

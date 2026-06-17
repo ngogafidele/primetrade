@@ -36,7 +36,7 @@ export default async function ExpensesPage() {
   await connectToDatabase()
   const expenses = await Expense.find()
     .populate("createdBy", "name email")
-    .sort({ createdAt: -1 })
+    .sort({ approvalStatus: -1, incurredAt: -1, createdAt: -1 })
     .lean<ExpensePageEntry[]>()
 
   const serializedExpenses = expenses.map((expense) => ({

@@ -51,6 +51,26 @@ const emptyForm: FormState = {
   incurredAt: "",
 }
 
+function getExpenseSortTime(expense: ExpenseClient) {
+  const value = expense.incurredAt ?? expense.createdAt
+  if (!value) return 0
+  const date = parseKigaliDateInput(value) ?? new Date(value)
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime()
+}
+
+function getExpenseApprovalSortRank(expense: ExpenseClient) {
+  return (expense.approvalStatus ?? "approved") === "pending" ? 0 : 1
+}
+
+function sortExpensesForList(items: ExpenseClient[]) {
+  return [...items].sort((a, b) => {
+    const statusDifference =
+      getExpenseApprovalSortRank(a) - getExpenseApprovalSortRank(b)
+    if (statusDifference !== 0) return statusDifference
+    return getExpenseSortTime(b) - getExpenseSortTime(a)
+  })
+}
+
 export function ExpensesManager({
   initialExpenses,
   currentUserLabel,
@@ -127,14 +147,16 @@ export function ExpensesManager({
       }
 
       const created = body.data as ExpenseClient
-      setExpenses((current) => [
-        {
-          ...created,
-          approvalStatus: created.approvalStatus ?? "approved",
-          createdByName: currentUserLabel,
-        },
-        ...current,
-      ])
+      setExpenses((current) =>
+        sortExpensesForList([
+          {
+            ...created,
+            approvalStatus: created.approvalStatus ?? "approved",
+            createdByName: currentUserLabel,
+          },
+          ...current,
+        ])
+      )
       setCurrentPage(1)
       resetForm()
     } catch {
@@ -162,10 +184,12 @@ export function ExpensesManager({
       }
 
       setExpenses((current) =>
-        current.map((item) =>
-          item._id === expense._id
-            ? { ...item, ...body.data, approvalStatus: "approved" }
-            : item
+        sortExpensesForList(
+          current.map((item) =>
+            item._id === expense._id
+              ? { ...item, ...body.data, approvalStatus: "approved" }
+              : item
+          )
         )
       )
     } catch {

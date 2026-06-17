@@ -72,6 +72,10 @@ export async function GET(request: NextRequest) {
       },
     }
 
+    if (!session.isAdmin) {
+      query.createdBy = session.userId
+    }
+
     if (customerPhone) {
       query["outstanding.customerPhone"] = customerPhone
     }

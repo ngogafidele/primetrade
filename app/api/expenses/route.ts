@@ -15,7 +15,11 @@ export async function GET(request: NextRequest) {
     }
 
     await connectToDatabase()
-    const expenses = await Expense.find().sort({ createdAt: -1 })
+    const expenses = await Expense.find().sort({
+      approvalStatus: -1,
+      incurredAt: -1,
+      createdAt: -1,
+    })
 
     return NextResponse.json({ success: true, data: expenses })
   } catch (error) {

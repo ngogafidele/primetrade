@@ -504,6 +504,13 @@ export async function PATCH(
       )
     }
 
+    if (!session.isAdmin) {
+      return NextResponse.json(
+        { success: false, error: "Admin only" },
+        { status: 403 }
+      )
+    }
+
     const { id } = await context.params
 
     await connectToDatabase()

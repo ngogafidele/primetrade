@@ -77,7 +77,7 @@ export default async function SalesPage() {
   const [sales, deletedSales] = await Promise.all([
     Sale.find(activeRecordFilter)
       .populate("createdBy", "name email")
-      .sort({ saleDate: -1, createdAt: -1 })
+      .sort({ approvalStatus: -1, saleDate: -1, createdAt: -1 })
       .lean<SalesPageSale[]>(),
     Sale.find({ deletedAt: { $type: "date" } })
       .populate("createdBy", "name email")
