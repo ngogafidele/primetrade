@@ -38,7 +38,6 @@ async function generateProductSku(name: string) {
   const skuPattern = `^${prefix}-\\d{4}$`
   const latestProduct = await Product.findOne({
     sku: { $regex: skuPattern },
-    ...activeRecordFilter,
   })
     .sort({ sku: -1 })
     .select("sku")
@@ -49,7 +48,7 @@ async function generateProductSku(name: string) {
 
   for (let sequence = latestSequence + 1; sequence <= 9999; sequence += 1) {
     const sku = `${prefix}-${String(sequence).padStart(4, "0")}`
-    const existing = await Product.exists({ sku, ...activeRecordFilter })
+    const existing = await Product.exists({ sku })
     if (!existing) return sku
   }
 

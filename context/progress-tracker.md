@@ -8,7 +8,7 @@ Update this file after completed features or meaningful architecture changes.
 
 Phase: Production-style operational app with context documentation added.
 
-Last completed: Multi-item loan statements now print shared transaction details only once.
+Last completed: Product SKU generation now reserves SKUs from soft-deleted products.
 
 Next: No active feature. Future work should start by reading this context folder and `AGENTS.md`.
 
@@ -46,6 +46,7 @@ Next: No active feature. Future work should start by reading this context folder
 - [x] Low-stock thresholds
 - [x] Low-stock alerts
 - [x] Soft-deleted products
+- [x] SKU generation avoids reusing soft-deleted product SKUs
 - [x] Product catalog PDF export
 
 ### Sales And Stock
@@ -126,6 +127,7 @@ Next: No active feature. Future work should start by reading this context folder
 - Admin idle timeout is shorter than staff timeout.
 - Admin-only sensitive fields are serialized conditionally.
 - Products, sales, and invoices use soft-delete conventions where implemented.
+- Product SKU generation treats soft-deleted product SKUs as permanently reserved.
 - Approved sales drive dashboard and report totals.
 - Admin-created sales decrement stock immediately; non-admin sales wait for approval.
 - Low-stock alerts must be synced after stock-changing operations.
