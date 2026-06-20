@@ -106,7 +106,7 @@ const businessFooterLines = [
   "Momo Pay: 77876 (Prime Trade Company)",
 ]
 
-const thankYouMessage = "Thank You For Doing Business With Us!"
+const thankYouMessage = "Thank you for doing business with us!"
 const thankYouFooterOffset = 64
 const headerRightColumn = {
   x: 300,

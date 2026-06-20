@@ -75,7 +75,7 @@ export default async function LoansPage() {
 
   const loanSales = await Sale.find(loanFilter)
     .populate("createdBy", "name email")
-    .sort({ "outstanding.paymentDate": 1, createdAt: -1 })
+    .sort({ saleDate: -1, createdAt: -1 })
     .lean<LoanSale[]>()
 
   const serializedSales = loanSales.map((sale) => {

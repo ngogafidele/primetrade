@@ -8,7 +8,7 @@ Update this file after completed features or meaningful architecture changes.
 
 Phase: Production-style operational app with context documentation added.
 
-Last completed: Loan statement PDFs now render each item from a multi-item transaction on its own row.
+Last completed: Loans list now shows the most recent loan transactions first.
 
 Next: No active feature. Future work should start by reading this context folder and `AGENTS.md`.
 
@@ -100,6 +100,7 @@ Next: No active feature. Future work should start by reading this context folder
 - [x] Reports PDF route
 - [x] Loans/outstanding PDF route
 - [x] Loan statement item rows for multi-item transactions
+- [x] Loans list newest-first ordering
 
 ### Context Documentation
 
@@ -143,4 +144,4 @@ Next: No active feature. Future work should start by reading this context folder
 
 ## Verification Notes
 
-Loan statement PDFs were updated so each item in a multi-item loan transaction prints on its own row. Full `npm.cmd run lint` and focused ESLint did not complete within the command timeout; `npx.cmd tsc --noEmit --pretty false` still reports pre-existing unrelated project type errors.
+Loans list ordering was updated so the most recent loan transactions appear first. Full `npm.cmd run lint` and focused ESLint previously did not complete within the command timeout; `npx.cmd tsc --noEmit --pretty false` still reports pre-existing unrelated project type errors.
