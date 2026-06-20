@@ -214,4 +214,4 @@ Files:
 Pattern notes:
 
 PDF actions should show pending state, use server routes, read `Content-Disposition` for filenames when needed, and never generate PDFs client-side.
-Loan statement PDFs should render each sale item on its own table row, repeating the transaction details for multi-item loans instead of collapsing items into comma-separated text.
+Loan statement PDFs should render each sale item on its own table row. For multi-item loans, transaction-level details such as number, sale date, payment date, and recorded-by should appear only on the first item row.

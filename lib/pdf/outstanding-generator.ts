@@ -41,6 +41,7 @@ type OutstandingPdfRow = {
   transactionNumber: number
   saleDate?: Date | string
   paymentDate?: Date | string
+  showTransactionDetails: boolean
   item: string
   unitPrice: string
   recordedBy?: string
@@ -165,6 +166,7 @@ function getStatementRows(sales: OutstandingPdfItem[]): OutstandingPdfRow[] {
           transactionNumber,
           saleDate: sale.saleDate,
           paymentDate: sale.paymentDate,
+          showTransactionDetails: true,
           item: "No items",
           unitPrice: "-",
           recordedBy: sale.recordedBy,
@@ -173,10 +175,11 @@ function getStatementRows(sales: OutstandingPdfItem[]): OutstandingPdfRow[] {
       ]
     }
 
-    return sale.items.map((item) => ({
+    return sale.items.map((item, itemIndex) => ({
       transactionNumber,
       saleDate: sale.saleDate,
       paymentDate: sale.paymentDate,
+      showTransactionDetails: itemIndex === 0,
       item: `${item.name} (${item.quantity} ${item.unit ?? "pcs"})`,
       unitPrice: formatCurrency(item.sellingPrice),
       recordedBy: sale.recordedBy,
@@ -314,6 +317,18 @@ export async function generateOutstandingCustomerPDF(
     }
 
     const textY = rowTop + 5
+    const transactionNumberText = row.showTransactionDetails
+      ? String(row.transactionNumber)
+      : ""
+    const saleDateText = row.showTransactionDetails
+      ? formatDate(row.saleDate)
+      : ""
+    const paymentDateText = row.showTransactionDetails
+      ? formatDate(row.paymentDate)
+      : ""
+    const recordedByText = row.showTransactionDetails
+      ? formatTableText(row.recordedBy, 14)
+      : ""
 
     doc
       .fillColor(index % 2 === 0 ? "#ffffff" : printColor.rowBackground)
@@ -322,13 +337,13 @@ export async function generateOutstandingCustomerPDF(
       .font("Helvetica")
       .fillColor(printColor.text)
       .fontSize(8)
-      .text(String(row.transactionNumber), columns.no, textY, {
+      .text(transactionNumberText, columns.no, textY, {
         width: 20,
       })
-      .text(formatDate(row.saleDate), columns.saleDate, textY, {
+      .text(saleDateText, columns.saleDate, textY, {
         width: 60,
       })
-      .text(formatDate(row.paymentDate), columns.paymentDate, textY, {
+      .text(paymentDateText, columns.paymentDate, textY, {
         width: 76,
       })
       .text(formatTableText(row.item, 28), columns.items, textY, {
@@ -337,7 +352,7 @@ export async function generateOutstandingCustomerPDF(
       .text(formatTableText(row.unitPrice, 14), columns.unitPrice, textY, {
         width: 64,
       })
-      .text(formatTableText(row.recordedBy, 14), columns.recordedBy, textY, {
+      .text(recordedByText, columns.recordedBy, textY, {
         width: 68,
       })
       .text(formatCurrency(row.amount), columns.amount, textY, {
