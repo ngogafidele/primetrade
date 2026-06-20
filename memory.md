@@ -1,39 +1,39 @@
-# Memory - Loan Statement And Loans List
+# Memory - Product SKU Reservation
 
-Last updated: 2026-06-20 14:09 +02:00
+Last updated: 2026-06-20 18:17 +02:00
 
 ## What was built
 
-- Updated `app/api/outstanding/pdf/route.ts` so loan statement PDF data passes structured sale items instead of comma-joined item and unit-price strings.
-- Updated `lib/pdf/outstanding-generator.ts` so loan statement PDFs render each sale item on its own table row.
-- Refined multi-item loan statement rows so transaction-level fields (`No`, sale date, payment date, recorded-by) appear only on the first item row for that transaction.
-- Updated `app/(dashboard)/loans/page.tsx` so the loans list sorts newest first by `saleDate`, then `createdAt`.
-- Updated `context/progress-tracker.md` and `context/ui-registry.md` to document the loan statement/list behavior.
+- Updated `app/api/products/route.ts` so generated product SKUs are checked against all product records, including soft-deleted products.
+- `generateProductSku()` now finds the latest matching SKU prefix without `activeRecordFilter`.
+- `generateProductSku()` now checks candidate availability with `Product.exists({ sku })`, so deleted product SKUs remain reserved.
+- Updated `context/progress-tracker.md` to document that product SKU generation avoids reusing soft-deleted product SKUs.
 
 ## Decisions made
 
-- Keep loan statement PDF generation server-side in `lib/pdf/outstanding-generator.ts`; client code continues to download through the existing loans/outstanding PDF API route.
-- For multi-item loan sales, item-specific fields (`Items`, `Unit Price`, `Amount`) print on every item row, while shared transaction fields print only once on the first item row.
-- The loans list should prioritize most recent loan transactions, not earliest expected payment date.
+- SKU history is enforced in the generator only for this pass.
+- The `Product` model SKU index was not changed; it still uses the existing partial unique index for active products.
+- Product name duplicate behavior remains unchanged: active products block duplicate names, soft-deleted products do not.
+- No UI pattern changed, so `/imprint` did not update `context/ui-registry.md`.
 
 ## Problems solved
 
-- Loan statement PDFs previously collapsed all items from one sale into comma-separated text in a single row, which became hard to read for transactions with many items.
-- A first pass repeated all transaction-level details on every item row; this was refined so unchanged details appear once per transaction.
+- New product creation could previously generate a SKU that had only been used by a soft-deleted product, because SKU lookup and existence checks used `activeRecordFilter`.
+- Single and batch product creation are both covered because both paths call the same `generateProductSku()` helper.
 
 ## Current state
 
-- The review skill found no issues with the loan statement/list changes.
-- `git diff --check` passed after the changes.
-- Full lint/typecheck is not cleanly verified: `npm.cmd run lint` and focused ESLint previously timed out, and `npx.cmd tsc --noEmit --pretty false` reports pre-existing unrelated project TypeScript errors.
-- At the time memory was saved, `git status --short --untracked-files=all` reported no working-tree changes, so the workspace may already have these changes saved or committed outside this session.
+- `/review` found no issues across plan alignment, system integrity, or production readiness.
+- `git diff --check` passed, with only the repo's existing CRLF warning.
+- Focused `npx.cmd eslint app/api/products/route.ts` timed out after 30 seconds, consistent with existing project verification notes.
+- Current expected working-tree changes are `app/api/products/route.ts`, `context/progress-tracker.md`, and this overwritten `memory.md`.
 
 ## Next session starts with
 
-- If more loan-statement polish is requested, start in `lib/pdf/outstanding-generator.ts` and inspect the generated table row layout.
-- If verification is needed, generate a sample loan statement PDF for a customer with a multi-item unpaid sale and visually confirm that shared transaction details appear once while each item appears on its own row.
+- If continuing this feature, decide whether to strengthen the database invariant by changing the `Product` SKU index from active-only uniqueness to global SKU uniqueness.
+- If shipping as-is, run the normal project verification flow when practical: `npm run lint` and `npm run build`, or document the existing timeout/pre-existing-error caveats.
 
 ## Open questions
 
-- Whether the PDF should visually group multi-item transaction rows with borders or spacing is not yet decided.
-- Whether the loans list should sort by `saleDate` only or fall back to `createdAt` when `saleDate` is missing is currently implemented as `saleDate` descending, then `createdAt` descending.
+- Whether SKU permanence should also be enforced at the MongoDB index level is still unresolved.
+- Existing databases may already contain active/deleted SKU duplicates; that only matters if the project later moves to a global unique SKU index.
