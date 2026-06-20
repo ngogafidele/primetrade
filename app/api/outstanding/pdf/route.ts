@@ -5,7 +5,6 @@ import { Sale } from "@/lib/db/models/Sale"
 import "@/lib/db/models/User"
 import { approvedSaleFilter } from "@/lib/db/sales-approval"
 import { getKigaliDateParts } from "@/lib/utils/time"
-import { formatCurrency } from "@/lib/utils/format"
 import { generateOutstandingCustomerPDF } from "@/lib/pdf/outstanding-generator"
 
 export const runtime = "nodejs"
@@ -104,14 +103,13 @@ export async function GET(request: NextRequest) {
         sales: sales.map((sale) => ({
           saleDate: sale.saleDate ?? sale.createdAt,
           paymentDate: sale.outstanding?.paymentDate,
-          items:
-            sale.items
-              .map((item) => `${item.name} (${item.quantity} ${item.unit ?? "pcs"})`)
-              .join(", ") || "No items",
-          unitPrices:
-            sale.items
-              .map((item) => `${item.name}: ${formatCurrency(item.sellingPrice)}`)
-              .join(", ") || "-",
+          items: sale.items.map((item) => ({
+            name: item.name,
+            unit: item.unit,
+            quantity: item.quantity,
+            sellingPrice: item.sellingPrice,
+            lineTotal: item.lineTotal,
+          })),
           recordedBy: resolveRecordedBy(sale.createdBy as PopulatedUser),
           notes: sale.notes ?? "",
           totalAmount: sale.totalAmount,

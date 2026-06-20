@@ -25,11 +25,26 @@ const PDFDocument =
 type OutstandingPdfItem = {
   saleDate?: Date | string
   paymentDate?: Date | string
-  items: string
-  unitPrices: string
+  items: Array<{
+    name: string
+    unit?: string
+    quantity: number
+    sellingPrice: number
+    lineTotal: number
+  }>
   recordedBy?: string
   notes?: string
   totalAmount: number
+}
+
+type OutstandingPdfRow = {
+  transactionNumber: number
+  saleDate?: Date | string
+  paymentDate?: Date | string
+  item: string
+  unitPrice: string
+  recordedBy?: string
+  amount: number
 }
 
 type OutstandingPdfData = {
@@ -138,6 +153,36 @@ function formatDate(value: Date | string | undefined) {
     month: "short",
     day: "2-digit",
   }).format(new Date(value))
+}
+
+function getStatementRows(sales: OutstandingPdfItem[]): OutstandingPdfRow[] {
+  return sales.flatMap((sale, saleIndex) => {
+    const transactionNumber = saleIndex + 1
+
+    if (sale.items.length === 0) {
+      return [
+        {
+          transactionNumber,
+          saleDate: sale.saleDate,
+          paymentDate: sale.paymentDate,
+          item: "No items",
+          unitPrice: "-",
+          recordedBy: sale.recordedBy,
+          amount: sale.totalAmount,
+        },
+      ]
+    }
+
+    return sale.items.map((item) => ({
+      transactionNumber,
+      saleDate: sale.saleDate,
+      paymentDate: sale.paymentDate,
+      item: `${item.name} (${item.quantity} ${item.unit ?? "pcs"})`,
+      unitPrice: formatCurrency(item.sellingPrice),
+      recordedBy: sale.recordedBy,
+      amount: item.lineTotal,
+    }))
+  })
 }
 
 function drawLogo(doc: OutstandingLogoDocument, storeInfo: StoreInfo) {
@@ -260,8 +305,9 @@ export async function generateOutstandingCustomerPDF(
     .text("AMOUNT", columns.amount, tableTop + 8)
 
   let rowTop = tableTop + tableHeaderHeight
+  const rows = getStatementRows(data.sales)
 
-  data.sales.forEach((sale, index) => {
+  rows.forEach((row, index) => {
     if (rowTop + tableRowHeight > 724) {
       doc.addPage()
       rowTop = 56
@@ -276,25 +322,25 @@ export async function generateOutstandingCustomerPDF(
       .font("Helvetica")
       .fillColor(printColor.text)
       .fontSize(8)
-      .text(String(index + 1), columns.no, textY, {
+      .text(String(row.transactionNumber), columns.no, textY, {
         width: 20,
       })
-      .text(formatDate(sale.saleDate), columns.saleDate, textY, {
+      .text(formatDate(row.saleDate), columns.saleDate, textY, {
         width: 60,
       })
-      .text(formatDate(sale.paymentDate), columns.paymentDate, textY, {
+      .text(formatDate(row.paymentDate), columns.paymentDate, textY, {
         width: 76,
       })
-      .text(formatTableText(sale.items, 28), columns.items, textY, {
+      .text(formatTableText(row.item, 28), columns.items, textY, {
         width: 124,
       })
-      .text(formatTableText(sale.unitPrices, 14), columns.unitPrice, textY, {
+      .text(formatTableText(row.unitPrice, 14), columns.unitPrice, textY, {
         width: 64,
       })
-      .text(formatTableText(sale.recordedBy, 14), columns.recordedBy, textY, {
+      .text(formatTableText(row.recordedBy, 14), columns.recordedBy, textY, {
         width: 68,
       })
-      .text(formatCurrency(sale.totalAmount), columns.amount, textY, {
+      .text(formatCurrency(row.amount), columns.amount, textY, {
         width: 42,
       })
 
