@@ -48,7 +48,7 @@ File: `app/page.tsx`
 
 | Property | Pattern |
 | --- | --- |
-| Background | Full-screen radial gradient using blue/red/amber utility overlays |
+| Background | Full-screen radial gradient using blue/red/amber utility overlays, plus a photo layer: `next/image` `/images/auth-background.webp` with `fill`, `priority`, `quality={55}`, `sizes="100vw"`, `object-cover opacity-52`, softened by a near-white horizontal gradient and a light primary/accent `color-mix` gradient |
 | Layout | `grid min-h-screen max-w-6xl ... lg:grid-cols-[1.05fr_0.95fr]` |
 | Login card | `rounded-xl border border-border/80 bg-card p-5 shadow-xl sm:p-7` |
 | Feature cards | `rounded-lg border border-border/80 bg-white/70 p-4 text-sm font-medium shadow-sm` |
@@ -58,6 +58,8 @@ File: `app/page.tsx`
 Pattern notes:
 
 Public login uses more visual branding than operational screens. Keep setup link visible from this page.
+
+The setup-admin page (`app/setup-admin/page.tsx`) uses the same background stack: gradient base, blur blobs, and the `/images/auth-background.webp` photo layer with the same overlays. The photo layer sits in an `aria-hidden` `pointer-events-none absolute inset-0 z-0` wrapper, and `main` gets `relative z-10` to stay above it.
 
 ---
 

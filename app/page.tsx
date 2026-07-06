@@ -56,7 +56,24 @@ export default function Home() {
       <div className="pointer-events-none absolute right-0 top-24 size-80 rounded-full bg-red-500/20 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 left-1/3 size-72 rounded-full bg-amber-400/20 blur-3xl" />
 
-      <main className="mx-auto grid min-h-screen max-w-6xl items-center gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+      >
+        <Image
+          src="/images/auth-background.webp"
+          alt=""
+          fill
+          priority
+          quality={55}
+          sizes="100vw"
+          className="object-cover opacity-52"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(248,251,255,0.54)_0%,rgba(248,251,255,0.34)_48%,rgba(248,251,255,0.22)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,color-mix(in_srgb,var(--primary)_6%,transparent),transparent_50%,color-mix(in_srgb,var(--accent)_4%,transparent))]" />
+      </div>
+
+      <main className="relative z-10 mx-auto grid min-h-screen max-w-6xl items-center gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-10">
         <section className="order-2 space-y-8 lg:order-1">
           <div className="flex items-center gap-4">
             <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/70 bg-white/90 p-2 shadow-[0_18px_45px_-30px_rgba(30,64,175,0.75)]">

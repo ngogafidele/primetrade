@@ -8,7 +8,7 @@ Update this file after completed features or meaningful architecture changes.
 
 Phase: Production-style operational app with context documentation added.
 
-Last completed: Product SKU generation now reserves SKUs from soft-deleted products.
+Last completed: Login and setup-admin pages now render a shared photo background layer (`/images/auth-background.webp`, adopted from the birw project) beneath the existing gradient styling.
 
 Next: No active feature. Future work should start by reading this context folder and `AGENTS.md`.
 
@@ -19,6 +19,7 @@ Next: No active feature. Future work should start by reading this context folder
 ### Foundation
 
 - [x] Next.js 16 App Router application
+- [x] Auth photo background on login and setup-admin pages
 - [x] Tailwind CSS v4 and shadcn/radix-nova theme
 - [x] MongoDB/Mongoose connection cache
 - [x] JWT cookie auth
@@ -148,3 +149,5 @@ Next: No active feature. Future work should start by reading this context folder
 ## Verification Notes
 
 Multi-item loan statement rows were refined so item lines remain separate while shared transaction details print only on the first item row. Full `npm.cmd run lint` and focused ESLint previously did not complete within the command timeout; `npx.cmd tsc --noEmit --pretty false` still reports pre-existing unrelated project type errors.
+
+Auth background work: `npm run build` compiles successfully, but static export fails while prerendering Next's internal `/_global-error` page with `InvariantError: Expected workStore to be initialized` — a Next.js internal issue unrelated to the login/setup-admin pages.
