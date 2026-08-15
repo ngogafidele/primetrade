@@ -8,6 +8,7 @@ import { Product } from "@/lib/db/models/Product"
 import { ReturnTransaction } from "@/lib/db/models/Return"
 import { Sale } from "@/lib/db/models/Sale"
 import { StockAdjustment } from "@/lib/db/models/StockAdjustment"
+import { getPaymentMethodTotals } from "@/lib/db/payments"
 import { approvedSaleDateFilter } from "@/lib/db/sales-approval"
 import { activeRecordFilter } from "@/lib/db/soft-delete"
 import {
@@ -27,11 +28,6 @@ type SaleTotals = {
   revenue: number
   grossProfit: number
   unitsSold: number
-}
-
-type PaymentMethodTotals = {
-  _id: "cash" | "mobile-money" | "bank"
-  total: number
 }
 
 type ProductTotals = {
@@ -245,7 +241,9 @@ export async function GET(request: NextRequest) {
         {
           $group: {
             _id: null,
-            outstandingSales: { $sum: "$totalAmount" },
+            outstandingSales: {
+              $sum: { $ifNull: ["$remainingBalance", "$totalAmount"] },
+            },
           },
         },
       ]),
@@ -298,21 +296,7 @@ export async function GET(request: NextRequest) {
           },
         },
       ]),
-      Sale.aggregate<PaymentMethodTotals>([
-        {
-          $match: {
-            ...approvedPeriodFilter,
-            paymentStatus: "paid",
-            paymentMethod: { $in: ["cash", "mobile-money", "bank"] },
-          },
-        },
-        {
-          $group: {
-            _id: "$paymentMethod",
-            total: { $sum: "$totalAmount" },
-          },
-        },
-      ]),
+      getPaymentMethodTotals(periodFilter),
       Sale.aggregate<ReportPdfTopMovingProduct>([
         { $match: approvedPeriodFilter },
         { $unwind: "$items" },
@@ -430,11 +414,9 @@ export async function GET(request: NextRequest) {
       expenses: expenseTotals[0]?.expenses ?? 0,
       returnCostImpact: 0,
       revenueCash:
-        paymentTotals.find((entry) => entry._id === "cash")?.total ?? 0,
-      revenueMobileMoney:
-        paymentTotals.find((entry) => entry._id === "mobile-money")?.total ?? 0,
-      revenueBank:
-        paymentTotals.find((entry) => entry._id === "bank")?.total ?? 0,
+        paymentTotals.cash,
+      revenueMobileMoney: paymentTotals["mobile-money"],
+      revenueBank: paymentTotals.bank,
       invoices: invoiceTotals[0]?.invoices ?? 0,
       unpaidInvoices: invoiceTotals[0]?.unpaidInvoices ?? 0,
       outstanding: invoiceTotals[0]?.outstanding ?? 0,

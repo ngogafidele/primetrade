@@ -8,7 +8,7 @@ Update this file after completed features or meaningful architecture changes.
 
 Phase: Production-style operational app with context documentation added.
 
-Last completed: Login and setup-admin pages now render a shared photo background layer (`/images/auth-background.webp`, adopted from the birw project) beneath the existing gradient styling.
+Last completed: Loans feature completed from the inventory reference with date/search filtering, installment payments, PDF downloads, admin loan delete/restore, password confirmation, notification endpoint, and sale-balance dashboard totals.
 
 Next: No active feature. Future work should start by reading this context folder and `AGENTS.md`.
 
@@ -104,6 +104,12 @@ Next: No active feature. Future work should start by reading this context folder
 - [x] Loan statement item rows for multi-item transactions
 - [x] Loan statement shared transaction details displayed once per transaction
 - [x] Loans list newest-first ordering
+- [x] Loans date/search filters
+- [x] Loan installment payment recording
+- [x] Admin deleted-loan list and restore flow
+- [x] Password confirmation for loan delete/restore actions
+- [x] Loan notifications API
+- [x] Dashboard outstanding amount uses unpaid sale remaining balances
 
 ### Context Documentation
 

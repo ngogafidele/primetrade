@@ -41,6 +41,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { authorized, session } = await requireAuth(request)
@@ -204,6 +208,11 @@ export async function POST(request: NextRequest) {
         notes: payload.notes ?? "",
         customer,
         outstanding,
+        payments: [],
+        amountPaid:
+          payload.paymentStatus === "paid" ? roundMoney(totalAmount) : 0,
+        remainingBalance:
+          payload.paymentStatus === "unpaid" ? roundMoney(totalAmount) : 0,
       })
       await Sale.collection.updateOne(
         { _id: sale._id },

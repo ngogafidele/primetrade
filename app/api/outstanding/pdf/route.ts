@@ -15,6 +15,35 @@ type PopulatedUser = {
   email?: string
 }
 
+type OutstandingSale = {
+  _id: { toString(): string }
+  saleDate?: Date
+  createdAt?: Date
+  totalAmount: number
+  amountPaid?: number
+  remainingBalance?: number
+  payments?: Array<{
+    amount: number
+    paymentMethod: "cash" | "mobile-money" | "bank"
+    paidAt?: Date
+    notes?: string
+  }>
+  items: Array<{
+    name: string
+    unit?: string
+    quantity: number
+    sellingPrice: number
+    lineTotal: number
+  }>
+  outstanding?: {
+    customerName?: string
+    customerPhone?: string
+    paymentDate?: Date
+  }
+  createdBy?: PopulatedUser | { toString(): string }
+  notes?: string
+}
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
@@ -38,6 +67,25 @@ function buildStatementNumber(id: string | undefined) {
 
 function safeFilePart(value: string) {
   return value.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "customer"
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100
+}
+
+function getAmountPaid(sale: OutstandingSale) {
+  if (typeof sale.amountPaid === "number") return roundMoney(sale.amountPaid)
+  return roundMoney(
+    (sale.payments ?? []).reduce((sum, payment) => sum + payment.amount, 0)
+  )
+}
+
+function getRemainingBalance(sale: OutstandingSale) {
+  if (typeof sale.remainingBalance === "number") {
+    return roundMoney(sale.remainingBalance)
+  }
+
+  return Math.max(0, roundMoney(sale.totalAmount - getAmountPaid(sale)))
 }
 
 export async function GET(request: NextRequest) {
@@ -82,6 +130,7 @@ export async function GET(request: NextRequest) {
     const sales = await Sale.find(query)
       .populate("createdBy", "name email")
       .sort({ "outstanding.paymentDate": 1, createdAt: -1 })
+      .lean<OutstandingSale[]>()
 
     if (sales.length === 0) {
       return NextResponse.json(
@@ -91,6 +140,11 @@ export async function GET(request: NextRequest) {
     }
 
     const totalAmount = sales.reduce((sum, sale) => sum + sale.totalAmount, 0)
+    const totalPaid = sales.reduce((sum, sale) => sum + getAmountPaid(sale), 0)
+    const totalOutstanding = sales.reduce(
+      (sum, sale) => sum + getRemainingBalance(sale),
+      0
+    )
     const statementNumber = buildStatementNumber(sales[0]?._id.toString())
 
     const pdf = await generateOutstandingCustomerPDF(
@@ -100,6 +154,16 @@ export async function GET(request: NextRequest) {
         customerName,
         customerPhone: customerPhone ?? sales[0]?.outstanding?.customerPhone ?? "",
         totalAmount,
+        totalPaid,
+        totalOutstanding,
+        payments: sales.flatMap((sale) =>
+          (sale.payments ?? []).map((payment) => ({
+            paidAt: payment.paidAt,
+            amount: payment.amount,
+            paymentMethod: payment.paymentMethod,
+            notes: payment.notes,
+          }))
+        ),
         sales: sales.map((sale) => ({
           saleDate: sale.saleDate ?? sale.createdAt,
           paymentDate: sale.outstanding?.paymentDate,
@@ -132,12 +196,8 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error("[Loan PDF Error]", error)
-    const detail =
-      process.env.NODE_ENV !== "production" && error instanceof Error
-        ? `: ${error.message}`
-        : ""
     return NextResponse.json(
-      { success: false, error: `Failed to generate loan PDF${detail}` },
+      { success: false, error: "Failed to generate loan PDF" },
       { status: 500 }
     )
   }

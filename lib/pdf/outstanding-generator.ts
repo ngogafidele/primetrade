@@ -48,6 +48,13 @@ type OutstandingPdfRow = {
   amount: number
 }
 
+type LoanPaymentRow = {
+  paidAt?: Date | string
+  amount: number
+  paymentMethod: "cash" | "mobile-money" | "bank"
+  notes?: string
+}
+
 type OutstandingPdfData = {
   number: string
   generatedAt?: Date | string
@@ -56,6 +63,9 @@ type OutstandingPdfData = {
   notes?: string
   sales: OutstandingPdfItem[]
   totalAmount: number
+  totalPaid?: number
+  totalOutstanding?: number
+  payments?: LoanPaymentRow[]
 }
 
 type StoreInfo = {
@@ -154,6 +164,12 @@ function formatDate(value: Date | string | undefined) {
     month: "short",
     day: "2-digit",
   }).format(new Date(value))
+}
+
+function formatPaymentMethod(value: LoanPaymentRow["paymentMethod"]) {
+  if (value === "mobile-money") return "Mobile Money"
+  if (value === "bank") return "Bank"
+  return "Cash"
 }
 
 function getStatementRows(sales: OutstandingPdfItem[]): OutstandingPdfRow[] {
@@ -382,29 +398,77 @@ export async function generateOutstandingCustomerPDF(
     .strokeColor(printColor.rule)
     .stroke()
 
-  let footerY = y + 58
+  let footerY = y + 86
+
+  let leftBlockY = y + 20
 
   if (noteText) {
     doc
       .font("Helvetica-Bold")
       .fontSize(11)
       .fillColor(printColor.text)
-      .text("Note", 48, y + 20)
+      .text("Note", 48, leftBlockY)
       .font("Helvetica")
       .fontSize(10)
       .fillColor(printColor.muted)
-      .text(noteText, 48, y + 38, { width: 260 })
+      .text(noteText, 48, leftBlockY + 18, { width: 260 })
 
     const noteHeight = estimateTextHeight(noteText)
-    footerY = Math.max(footerY, y + 66 + noteHeight)
+    leftBlockY += 34 + noteHeight
+    footerY = Math.max(footerY, leftBlockY)
+  }
+
+  if (data.payments?.length) {
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .fillColor(printColor.text)
+      .text("Payments", 48, leftBlockY)
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor(printColor.muted)
+
+    data.payments.slice(0, 6).forEach((payment, index) => {
+      const paymentText = `${formatDate(payment.paidAt)} - ${formatCurrency(
+        payment.amount
+      )} via ${formatPaymentMethod(payment.paymentMethod)}${
+        payment.notes?.trim() ? ` (${payment.notes.trim()})` : ""
+      }`
+      doc.text(formatTableText(paymentText, 56), 48, leftBlockY + 18 + index * 12, {
+        width: 260,
+      })
+    })
+
+    if (data.payments.length > 6) {
+      doc.text(
+        `+${data.payments.length - 6} more payment records`,
+        48,
+        leftBlockY + 18 + 6 * 12,
+        { width: 260 }
+      )
+    }
+
+    footerY = Math.max(
+      footerY,
+      leftBlockY + 32 + Math.min(data.payments.length, 7) * 12
+    )
   }
 
   doc
     .font("Helvetica-Bold")
-    .fontSize(14)
+    .fontSize(12)
     .fillColor(printColor.text)
-    .text("Total Loan: ", 318, y + 20)
+    .text("Total Loan:", 318, y + 20)
     .text(formatCurrency(data.totalAmount), 462, y + 20, { width: 78 })
+    .text("Paid:", 318, y + 38)
+    .text(formatCurrency(data.totalPaid ?? 0), 462, y + 38, { width: 78 })
+    .text("Remaining:", 318, y + 56)
+    .text(
+      formatCurrency(data.totalOutstanding ?? data.totalAmount),
+      462,
+      y + 56,
+      { width: 78 }
+    )
 
   if (footerY > 700) {
     doc.addPage()

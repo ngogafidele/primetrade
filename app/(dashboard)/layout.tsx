@@ -59,6 +59,7 @@ type BelowCostProductNotification = {
 type LoanNotification = {
   _id: { toString(): string }
   totalAmount: number
+  remainingBalance?: number
   outstanding?: {
     customerName?: string
     customerPhone?: string
@@ -126,7 +127,7 @@ async function getHeaderNotifications(): Promise<HeaderNotifications> {
         .sort({ name: 1 })
         .lean<BelowCostProductNotification[]>(),
       Sale.find({ ...approvedSaleFilter, paymentStatus: "unpaid" })
-        .select("totalAmount outstanding")
+        .select("totalAmount remainingBalance outstanding")
         .sort({ "outstanding.paymentDate": 1, createdAt: -1 })
         .lean<LoanNotification[]>(),
     ])
@@ -142,7 +143,7 @@ async function getHeaderNotifications(): Promise<HeaderNotifications> {
       month: "short",
       day: "2-digit",
     }),
-    totalAmount: sale.totalAmount,
+    totalAmount: sale.remainingBalance ?? sale.totalAmount,
   }))
 
   return {

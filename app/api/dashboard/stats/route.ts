@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
       salesToday,
       invoiceCount,
       unpaidCount,
+      loansToday,
     ] = await Promise.all([
       Product.countDocuments(activeRecordFilter),
       Product.countDocuments({
@@ -102,6 +103,17 @@ export async function GET(request: NextRequest) {
       Sale.countDocuments(todayFilter),
       Invoice.countDocuments(activeRecordFilter),
       Invoice.countDocuments({ status: "unpaid", ...activeRecordFilter }),
+      Sale.aggregate<DashboardMoneyTotal>([
+        { $match: { ...todayFilter, paymentStatus: "unpaid" } },
+        {
+          $group: {
+            _id: null,
+            total: {
+              $sum: { $ifNull: ["$remainingBalance", "$totalAmount"] },
+            },
+          },
+        },
+      ]),
     ])
 
     const sales = await Sale.aggregate<DashboardMoneyTotal>([
@@ -131,9 +143,16 @@ export async function GET(request: NextRequest) {
       },
     ])
 
-    const unpaidTotals = await Invoice.aggregate<DashboardMoneyTotal>([
-      { $match: { status: "unpaid", ...activeRecordFilter } },
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    const unpaidTotals = await Sale.aggregate<DashboardMoneyTotal>([
+      { $match: { ...approvedSaleFilter, paymentStatus: "unpaid" } },
+      {
+        $group: {
+          _id: null,
+          total: {
+            $sum: { $ifNull: ["$remainingBalance", "$totalAmount"] },
+          },
+        },
+      },
     ])
 
     const todaySalesTotals = await Sale.aggregate<DashboardRevenueTotal>([
@@ -334,6 +353,7 @@ export async function GET(request: NextRequest) {
           : {}),
         expensesToday: todayExpenses[0]?.total || 0,
         ...(session.isAdmin ? { returnCostToday } : {}),
+        loansToday: loansToday[0]?.total || 0,
         outstandingAmount: unpaidTotals[0]?.total || 0,
         lowStockProducts: lowStockProducts.map((product) => ({
           _id: product._id.toString(),

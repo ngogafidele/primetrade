@@ -217,3 +217,24 @@ Pattern notes:
 
 PDF actions should show pending state, use server routes, read `Content-Disposition` for filenames when needed, and never generate PDFs client-side.
 Loan statement PDFs should render each sale item on its own table row. For multi-item loans, transaction-level details such as number, sale date, payment date, and recorded-by should appear only on the first item row.
+
+---
+
+## Loans Manager
+
+File: `components/outstanding/outstanding-manager.tsx`
+
+| Property | Pattern |
+| --- | --- |
+| State owner | Client component with active loans, deleted loans, filters, payment dialog, PDF download, and admin restore/delete confirmation |
+| Search | Name/phone search with normalized alphanumeric matching |
+| Date filters | `Input type="date"` from/to filters against serialized sale date |
+| Metrics | `StatsCard` for matching loans and admin-visible remaining loan amount |
+| Status badges | Token-based destructive/accent badges for overdue and due-today loans |
+| Payments | Admin-only installment dialog using `Select` payment method and amount/notes inputs |
+| Delete/restore | Admin-only `PasswordConfirmDialog`; delete returns stock and restore deducts stock again |
+| Tables | Shared `Table` primitives inside operational cards; payment history appears as a secondary row |
+
+Pattern notes:
+
+Loans mirror the finished outstanding workflow from the inventory project while preserving PrimeTrade payment method values: `cash`, `mobile-money`, and `bank`. Non-admin users can view their own approved active loans and download statements, but payment/delete/restore actions are admin-only.

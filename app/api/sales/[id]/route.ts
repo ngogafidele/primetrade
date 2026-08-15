@@ -5,6 +5,7 @@ import { Product } from "@/lib/db/models/Product"
 import { Proforma } from "@/lib/db/models/Proforma"
 import { Sale } from "@/lib/db/models/Sale"
 import { requireAdmin, requireAuth } from "@/lib/auth/middleware"
+import { verifyActionPassword } from "@/lib/auth/step-up"
 import { syncLowStockAlert } from "@/lib/db/alerts"
 import { approvedSaleFilter } from "@/lib/db/sales-approval"
 import { serializeSaleForSession } from "@/lib/db/sales-serialization"
@@ -23,6 +24,21 @@ type SaleItemForApproval = SaleItemForRestock & {
 
 type SaleItemForUpdate = SaleItemForRestock & {
   productId: { toString(): string }
+}
+
+type ExistingLoanPayment = {
+  amount?: number
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100
+}
+
+function getAmountPaidFromPayments(payments: ExistingLoanPayment[] | undefined) {
+  if (!Array.isArray(payments)) return 0
+  return roundMoney(
+    payments.reduce((sum, payment) => sum + (payment.amount ?? 0), 0)
+  )
 }
 
 function getQuantityMap(items: SaleItemForUpdate[]) {
@@ -287,6 +303,32 @@ export async function PATCH(
       }
 
       try {
+        const existingPayments =
+          sale.payments as ExistingLoanPayment[] | undefined
+        const amountPaidFromPayments =
+          getAmountPaidFromPayments(existingPayments)
+        const currentAmountPaid =
+          typeof sale.amountPaid === "number"
+            ? sale.amountPaid
+            : amountPaidFromPayments
+        const amountPaid =
+          updatePayload.paymentStatus === "unpaid"
+            ? Math.max(currentAmountPaid, amountPaidFromPayments)
+            : roundMoney(totalAmount)
+
+        if (
+          updatePayload.paymentStatus === "unpaid" &&
+          amountPaid > roundMoney(totalAmount)
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Existing payments exceed the updated sale total",
+            },
+            { status: 400 }
+          )
+        }
+
         sale.set({
           items: saleItems,
           totalAmount,
@@ -299,6 +341,11 @@ export async function PATCH(
           saleDate,
           customer,
           outstanding,
+          amountPaid,
+          remainingBalance:
+            updatePayload.paymentStatus === "unpaid"
+              ? Math.max(0, roundMoney(totalAmount - amountPaid))
+              : 0,
         })
         await sale.save()
       } catch (error) {
@@ -504,6 +551,16 @@ export async function PATCH(
       )
     }
 
+    if (
+      !payload.paymentMethod ||
+      !["cash", "mobile-money", "bank"].includes(payload.paymentMethod)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Payment method is required" },
+        { status: 400 }
+      )
+    }
+
     if (!session.isAdmin) {
       return NextResponse.json(
         { success: false, error: "Admin only" },
@@ -527,21 +584,62 @@ export async function PATCH(
       )
     }
 
-    sale.set({
+    const existingPayments = sale.payments as ExistingLoanPayment[] | undefined
+    const amountPaid = Math.max(
+      typeof sale.amountPaid === "number" ? sale.amountPaid : 0,
+      getAmountPaidFromPayments(existingPayments)
+    )
+    const remainingBalance =
+      typeof sale.remainingBalance === "number"
+        ? roundMoney(sale.remainingBalance)
+        : Math.max(0, roundMoney(sale.totalAmount - amountPaid))
+    const settlementAmount = roundMoney(remainingBalance)
+
+    const setFields: Record<string, unknown> = {
       paymentStatus: "paid",
+      paymentMethod: payload.paymentMethod,
+      amountPaid: roundMoney(amountPaid + settlementAmount),
+      remainingBalance: 0,
       customer: sale.outstanding
         ? {
             customerName: sale.outstanding.customerName,
             customerPhone: sale.outstanding.customerPhone,
           }
         : undefined,
-      outstanding: undefined,
-    })
-    await sale.save()
+    }
+    const update: Record<string, unknown> = {
+      $set: setFields,
+      $unset: { outstanding: "" },
+    }
+
+    if (settlementAmount > 0) {
+      update.$push = {
+        payments: {
+          amount: settlementAmount,
+          paymentMethod: payload.paymentMethod,
+          paidAt: new Date(),
+          receivedBy: session.userId,
+          notes: "Loan settled",
+        },
+      }
+    }
+
+    const updatedSale = await Sale.findOneAndUpdate(
+      { _id: sale._id, paymentStatus: "unpaid", ...approvedSaleFilter },
+      update,
+      { new: true }
+    )
+
+    if (!updatedSale) {
+      return NextResponse.json(
+        { success: false, error: "Loan sale not found" },
+        { status: 404 }
+      )
+    }
 
     return NextResponse.json({
       success: true,
-      data: serializeSaleForSession(sale, session.isAdmin),
+      data: serializeSaleForSession(updatedSale, session.isAdmin),
     })
   } catch (error) {
     return NextResponse.json(
@@ -564,10 +662,23 @@ export async function DELETE(
       )
     }
 
+    const loanOnly = request.nextUrl.searchParams.get("loan") === "true"
+    let deletionReason = ""
+
+    if (loanOnly) {
+      await connectToDatabase()
+      const verified = await verifyActionPassword(request, session)
+      if (!verified.ok) {
+        return verified.response
+      }
+      deletionReason = "loan_deleted"
+    } else {
+      const payload = await request.json().catch(() => null)
+      deletionReason =
+        typeof payload?.reason === "string" ? payload.reason.trim() : ""
+    }
+
     const { id } = await context.params
-    const payload = await request.json().catch(() => null)
-    const deletionReason =
-      typeof payload?.reason === "string" ? payload.reason.trim() : ""
 
     if (!deletionReason) {
       return NextResponse.json(
@@ -583,6 +694,13 @@ export async function DELETE(
       return NextResponse.json(
         { success: false, error: "Sale not found" },
         { status: 404 }
+      )
+    }
+
+    if (loanOnly && sale.paymentStatus !== "unpaid") {
+      return NextResponse.json(
+        { success: false, error: "Only unpaid loan sales can be deleted here" },
+        { status: 400 }
       )
     }
 
