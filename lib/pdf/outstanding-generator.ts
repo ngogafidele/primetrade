@@ -2,6 +2,7 @@ import { createRequire } from "module"
 import path from "node:path"
 import type * as Fs from "node:fs"
 import { formatCurrency } from "@/lib/utils/format"
+import { formatInKigali } from "@/lib/utils/time"
 
 const require = createRequire(import.meta.url)
 const {
@@ -159,11 +160,11 @@ function getLogoBuffer() {
 
 function formatDate(value: Date | string | undefined) {
   if (!value) return "-"
-  return new Intl.DateTimeFormat("en-RW", {
+  return formatInKigali(value, {
     year: "numeric",
     month: "short",
     day: "2-digit",
-  }).format(new Date(value))
+  })
 }
 
 function formatPaymentMethod(value: LoanPaymentRow["paymentMethod"]) {

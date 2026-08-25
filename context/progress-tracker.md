@@ -110,6 +110,7 @@ Next: No active feature. Future work should start by reading this context folder
 - [x] Password confirmation for loan delete/restore actions
 - [x] Loan notifications API
 - [x] Dashboard outstanding amount uses unpaid sale remaining balances
+- [x] Loan statement PDF dates use Kigali timezone formatting
 
 ### Context Documentation
 
