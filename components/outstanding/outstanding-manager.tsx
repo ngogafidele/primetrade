@@ -159,6 +159,9 @@ export function OutstandingManager({
   const [paymentMethod, setPaymentMethod] = useState<
     "cash" | "mobile-money" | "bank"
   >("cash")
+  const [paymentMadeDate, setPaymentMadeDate] = useState(
+    formatKigaliDateInput(new Date())
+  )
   const [paymentNotes, setPaymentNotes] = useState("")
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null)
@@ -228,6 +231,7 @@ export function OutstandingManager({
     setPaymentTarget(sale)
     setPaymentAmount(String(getRemainingBalance(sale)))
     setPaymentMethod("cash")
+    setPaymentMadeDate(formatKigaliDateInput(new Date()))
     setPaymentNotes("")
   }
 
@@ -250,6 +254,11 @@ export function OutstandingManager({
       return
     }
 
+    if (!paymentMadeDate) {
+      setError("Choose the date the payment was made.")
+      return
+    }
+
     setUpdatingId(paymentTarget._id)
     setError(null)
 
@@ -257,7 +266,12 @@ export function OutstandingManager({
       const response = await fetch(`/api/sales/${paymentTarget._id}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, paymentMethod, notes: paymentNotes }),
+        body: JSON.stringify({
+          amount,
+          paymentMethod,
+          paidAt: paymentMadeDate,
+          notes: paymentNotes,
+        }),
       })
       const body = await response.json().catch(() => null)
 
@@ -392,15 +406,10 @@ export function OutstandingManager({
         return
       }
 
-      const {
-        deletedByName: _deletedByName,
-        deletedAtLabel: _deletedAtLabel,
-        ...restored
-      } = restoreTarget
       setDeletedSales((current) =>
         current.filter((sale) => sale._id !== restoreTarget._id)
       )
-      setSales((current) => [restored, ...current])
+      setSales((current) => [restoreTarget, ...current])
       setRestoreTarget(null)
       refreshLoanNotifications()
       router.refresh()
@@ -808,6 +817,14 @@ export function OutstandingManager({
                   <SelectItem value="bank">Bank</SelectItem>
                 </SelectContent>
               </Select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              Payment made date
+              <Input
+                type="date"
+                value={paymentMadeDate}
+                onChange={(event) => setPaymentMadeDate(event.target.value)}
+              />
             </label>
             <label className="grid gap-1 text-sm">
               Notes

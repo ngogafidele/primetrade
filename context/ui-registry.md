@@ -231,10 +231,10 @@ File: `components/outstanding/outstanding-manager.tsx`
 | Date filters | `Input type="date"` from/to filters against serialized sale date |
 | Metrics | `StatsCard` for matching loans and admin-visible remaining loan amount |
 | Status badges | Token-based destructive/accent badges for overdue and due-today loans |
-| Payments | Admin-only installment dialog using `Select` payment method and amount/notes inputs |
+| Payments | Admin-only installment dialog using amount, `Select` payment method, payment-made date, and notes inputs |
 | Delete/restore | Admin-only `PasswordConfirmDialog`; delete returns stock and restore deducts stock again |
 | Tables | Shared `Table` primitives inside operational cards; payment history appears as a secondary row |
 
 Pattern notes:
 
-Loans mirror the finished outstanding workflow from the inventory project while preserving PrimeTrade payment method values: `cash`, `mobile-money`, and `bank`. Non-admin users can view their own approved active loans and download statements, but payment/delete/restore actions are admin-only.
+Loans mirror the finished outstanding workflow from the inventory project while preserving PrimeTrade payment method values: `cash`, `mobile-money`, and `bank`. Non-admin users can view their own approved active loans and download statements, but payment/delete/restore actions are admin-only. Payment records store the date the payment was made, defaulting to today's Kigali date when the dialog opens.

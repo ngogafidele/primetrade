@@ -6,11 +6,13 @@ import { connectToDatabase } from "@/lib/db/connection"
 import { Invoice } from "@/lib/db/models/Invoice"
 import { Sale } from "@/lib/db/models/Sale"
 import { approvedSaleFilter } from "@/lib/db/sales-approval"
+import { parseKigaliDateInput } from "@/lib/utils/time"
 
 const LoanPaymentSchema = z
   .object({
     amount: z.number().positive(),
     paymentMethod: z.enum(["cash", "mobile-money", "bank"]),
+    paidAt: z.string().trim().min(1),
     notes: z.string().optional(),
   })
   .strict()
@@ -76,20 +78,29 @@ export async function POST(
 
     const { id } = await context.params
     const payload = LoanPaymentSchema.parse(await request.json())
+    const paidAt = parseKigaliDateInput(payload.paidAt)
+
+    if (!paidAt) {
+      return NextResponse.json(
+        { success: false, error: "Choose a valid payment date" },
+        { status: 400 }
+      )
+    }
 
     const db = await connectToDatabase()
     dbSession = await db.startSession()
+    const activeDbSession = dbSession
 
     let updatedSale: unknown = null
 
-    await dbSession.withTransaction(async () => {
+    await activeDbSession.withTransaction(async () => {
       const saleFilter: Record<string, unknown> = {
         _id: id,
         paymentStatus: "unpaid",
         ...approvedSaleFilter,
       }
       const sale = await Sale.findOne(saleFilter)
-        .session(dbSession)
+        .session(activeDbSession)
         .lean<LoanSaleForPayment | null>()
 
       if (!sale) {
@@ -130,7 +141,7 @@ export async function POST(
             payments: {
               amount,
               paymentMethod: payload.paymentMethod,
-              paidAt: new Date(),
+              paidAt,
               receivedBy: session.userId,
               notes: payload.notes?.trim() ?? "",
             },
@@ -150,7 +161,7 @@ export async function POST(
           },
           ...(isSettled ? { $unset: { outstanding: "" } } : {}),
         },
-        { new: true, session: dbSession }
+        { new: true, session: activeDbSession }
       )
 
       if (!updatedSale) {
@@ -161,7 +172,7 @@ export async function POST(
         await Invoice.updateOne(
           { saleId: sale._id.toString(), deletedAt: null },
           { status: "paid" },
-          { session: dbSession }
+          { session: activeDbSession }
         )
       }
     })

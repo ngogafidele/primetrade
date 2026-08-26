@@ -8,7 +8,7 @@ Update this file after completed features or meaningful architecture changes.
 
 Phase: Production-style operational app with context documentation added.
 
-Last completed: Loans feature completed from the inventory reference with date/search filtering, installment payments, PDF downloads, admin loan delete/restore, password confirmation, notification endpoint, and sale-balance dashboard totals.
+Last completed: Loan payment recording now lets admins choose the date the payment was made, while defaulting to today's Kigali date.
 
 Next: No active feature. Future work should start by reading this context folder and `AGENTS.md`.
 
@@ -106,6 +106,7 @@ Next: No active feature. Future work should start by reading this context folder
 - [x] Loans list newest-first ordering
 - [x] Loans date/search filters
 - [x] Loan installment payment recording
+- [x] Loan installment payment made-date selection
 - [x] Admin deleted-loan list and restore flow
 - [x] Password confirmation for loan delete/restore actions
 - [x] Loan notifications API
