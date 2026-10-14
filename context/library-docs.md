@@ -180,6 +180,8 @@ Current generators:
 - `sales-list-generator.ts`
 - `outstanding-generator.ts`
 
+Shared helper: `stamp.ts` places the signed company stamp (`public/images/stamp.jpg`, a 400px JPEG copy of the original scan flattened onto white) above the thank-you footer on customer-facing documents.
+
 Rules:
 
 - Generate PDFs server-side only.
@@ -223,6 +225,23 @@ Rules:
 - Expired reset tokens are handled by TTL index.
 
 ---
+
+## ExcelJS
+
+Library: `exceljs` 4.x. Listed in `serverExternalPackages` in `next.config.ts` alongside `pdfkit`.
+
+Workbook builders live in `lib/excel`:
+
+- `workbook.ts`: `createWorkbook`, header/row styling, `toExcelDate`, `workbookToBytes`, number formats, `xlsxContentType`.
+- `products-catalog-workbook.ts`: full active catalog (no date range).
+- `sales-list-workbook.ts`: one row per sale item plus a Summary sheet.
+
+Rules:
+
+- Generate workbooks server-side only, in admin-only routes (both exports contain cost/profit).
+- Load data through the same shared loader as the matching PDF route (`loadProductCatalog`, `loadSalesList`) so PDF and Excel never drift.
+- Write dates with `toExcelDate()`, which shifts to Kigali wall-clock time; raw `Date` values appear in UTC in Excel.
+- Write numbers as numbers with `numFmt`, not preformatted strings, so admins can sum and filter.
 
 ## class-variance-authority
 

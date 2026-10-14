@@ -2,6 +2,11 @@ import { createRequire } from "module"
 import path from "node:path"
 import type * as Fs from "node:fs"
 import { formatCurrency } from "@/lib/utils/format"
+import {
+  drawStamp,
+  getStampedFooterY,
+  getStampedPageFooterY,
+} from "@/lib/pdf/stamp"
 
 const require = createRequire(import.meta.url)
 const {
@@ -357,10 +362,13 @@ export async function generateReturnReceiptPDF(
       width: 92,
     })
 
+  footerY = getStampedFooterY(footerY, y + 38, thankYouFooterOffset)
   if (footerY > 700) {
     doc.addPage()
-    footerY = 56
+    footerY = getStampedPageFooterY(thankYouFooterOffset)
   }
+
+  drawStamp(doc, footerY, thankYouFooterOffset)
 
   doc
     .font("Helvetica-Bold")

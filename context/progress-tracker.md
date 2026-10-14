@@ -8,7 +8,7 @@ Update this file after completed features or meaningful architecture changes.
 
 Phase: Production-style operational app with context documentation added.
 
-Last completed: Loan payment recording now lets admins choose the date the payment was made, while defaulting to today's Kigali date.
+Last completed: Admin Excel exports for the products list (full catalog) and the sales list (date range).
 
 Next: No active feature. Future work should start by reading this context folder and `AGENTS.md`.
 
@@ -49,6 +49,7 @@ Next: No active feature. Future work should start by reading this context folder
 - [x] Soft-deleted products
 - [x] SKU generation avoids reusing soft-deleted product SKUs
 - [x] Product catalog PDF export
+- [x] Products Excel export (admin, full active catalog)
 
 ### Sales And Stock
 
@@ -62,6 +63,7 @@ Next: No active feature. Future work should start by reading this context folder
 - [x] Low-stock alert sync
 - [x] Sales soft delete
 - [x] Sales list PDF
+- [x] Sales list Excel export (admin, date range, item rows + summary sheet)
 
 ### Returns
 
@@ -112,6 +114,7 @@ Next: No active feature. Future work should start by reading this context folder
 - [x] Loan notifications API
 - [x] Dashboard outstanding amount uses unpaid sale remaining balances
 - [x] Loan statement PDF dates use Kigali timezone formatting
+- [x] Company stamp on invoice, proforma, return receipt, and loan statement PDFs
 
 ### Context Documentation
 
@@ -157,5 +160,7 @@ Next: No active feature. Future work should start by reading this context folder
 ## Verification Notes
 
 Multi-item loan statement rows were refined so item lines remain separate while shared transaction details print only on the first item row. Full `npm.cmd run lint` and focused ESLint previously did not complete within the command timeout; `npx.cmd tsc --noEmit --pretty false` still reports pre-existing unrelated project type errors.
+
+Excel export work (2026-10-14): `npm run build` completed successfully, including the previously failing `/_global-error` prerender. Workbooks were verified by generating sample files and reading them back. The live routes were not exercised against the database.
 
 Auth background work: `npm run build` compiles successfully, but static export fails while prerendering Next's internal `/_global-error` page with `InvariantError: Expected workStore to be initialized` — a Next.js internal issue unrelated to the login/setup-admin pages.

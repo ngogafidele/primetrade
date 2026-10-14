@@ -2,6 +2,11 @@ import { createRequire } from "module"
 import path from "node:path"
 import type * as Fs from "node:fs"
 import { formatCurrency } from "@/lib/utils/format"
+import {
+  drawStamp,
+  getStampedFooterY,
+  getStampedPageFooterY,
+} from "@/lib/pdf/stamp"
 
 const require = createRequire(import.meta.url)
 const {
@@ -368,11 +373,13 @@ function writeInvoicePdf(
     .text(formatCurrency(data.totalAmount), 448, y + 20, { width: 92 })
 
   if (footerLines.length > 0) {
-    let footerY = nextSectionY
+    let footerY = getStampedFooterY(nextSectionY, y + 38, thankYouFooterOffset)
     if (footerY > 700) {
       doc.addPage()
-      footerY = 56
+      footerY = getStampedPageFooterY(thankYouFooterOffset)
     }
+
+    drawStamp(doc, footerY, thankYouFooterOffset)
 
     doc
       .font("Helvetica-Bold")

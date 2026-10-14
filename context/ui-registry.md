@@ -95,6 +95,7 @@ File: `components/products/products-manager.tsx`
 | Currency | `formatCurrency` |
 | Tables | Shared table primitives inside operational cards |
 | Dialogs | Existing dialog primitives for create/edit and supply |
+| Exports | Admin-only `Catalog PDF` (`FileText`) and `Products Excel` (`FileSpreadsheet`) outline buttons in the page header; products Excel has no date range |
 
 Pattern notes:
 
@@ -111,7 +112,8 @@ File: `components/sales/sales-manager.tsx`
 | State owner | Client component with sale draft rows, dialogs, approval state, PDF state, search, pagination |
 | Pagination | 20 sales per page |
 | Product selection | `ProductSearchSelect` |
-| Date defaults | Month-to-today PDF range from Kigali date helpers |
+| Date defaults | Month-to-today export range from Kigali date helpers |
+| Exports | Admin-only From/To date inputs shared by `Sales List PDF` and `Sales List Excel` outline buttons; one `downloadingFormat` state disables both while either is preparing |
 | Payment states | `paid` and `unpaid` |
 | Payment methods | `cash`, `mobile-money`, `bank` |
 | Outstanding details | customer name, customer phone, payment date |
@@ -206,16 +208,17 @@ Notifications are computed server-side in the dashboard layout so the header ref
 
 ---
 
-## PDF Buttons
+## PDF And Excel Buttons
 
 Files:
 
 - `components/reports/report-print-button.tsx`
-- manager components with PDF download handlers
+- manager components with PDF/Excel download handlers
 
 Pattern notes:
 
-PDF actions should show pending state, use server routes, read `Content-Disposition` for filenames when needed, and never generate PDFs client-side.
+PDF and Excel actions should show pending state (`Preparing PDF...` / `Preparing Excel...`), use server routes, read `Content-Disposition` for filenames when needed, and never generate files client-side. Excel buttons use the lucide `FileSpreadsheet` icon; PDF buttons use `FileText`.
+Customer-facing PDFs (sales invoices, proformas, return receipts, loan statements) draw the signed company stamp bottom-right, just above the thank-you bar, via `lib/pdf/stamp.ts` (`getStampedFooterY`, `getStampedPageFooterY`, `drawStamp`) using the downscaled `public/images/stamp.jpg` (JPEG on white, ~39 KB). Internal PDFs (reports, catalog, sales list) are not stamped.
 Loan statement PDFs should render each sale item on its own table row. For multi-item loans, transaction-level details such as number, sale date, payment date, and recorded-by should appear only on the first item row.
 
 ---

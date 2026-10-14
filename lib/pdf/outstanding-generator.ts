@@ -2,6 +2,11 @@ import { createRequire } from "module"
 import path from "node:path"
 import type * as Fs from "node:fs"
 import { formatCurrency } from "@/lib/utils/format"
+import {
+  drawStamp,
+  getStampedFooterY,
+  getStampedPageFooterY,
+} from "@/lib/pdf/stamp"
 import { formatInKigali } from "@/lib/utils/time"
 
 const require = createRequire(import.meta.url)
@@ -471,10 +476,13 @@ export async function generateOutstandingCustomerPDF(
       { width: 78 }
     )
 
+  footerY = getStampedFooterY(footerY, y + 72, thankYouFooterOffset)
   if (footerY > 700) {
     doc.addPage()
-    footerY = 56
+    footerY = getStampedPageFooterY(thankYouFooterOffset)
   }
+
+  drawStamp(doc, footerY, thankYouFooterOffset)
 
   doc
     .font("Helvetica-Bold")

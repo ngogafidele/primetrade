@@ -194,6 +194,7 @@ Current key dependencies:
 - `bcrypt`
 - `zod`
 - `pdfkit`
+- `exceljs`
 - `lucide-react`
 - `radix-ui`
 - `class-variance-authority`

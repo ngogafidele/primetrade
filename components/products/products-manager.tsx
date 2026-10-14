@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { formatCurrency } from "@/lib/utils/format"
-import { FileText, PackagePlus, Plus, Trash2 } from "lucide-react"
+import { FileSpreadsheet, FileText, PackagePlus, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -134,6 +134,7 @@ export function ProductsManager({
   const [error, setError] = useState<string | null>(null)
   const [supplyError, setSupplyError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [isDownloadingExcel, setIsDownloadingExcel] = useState(false)
 
   const costValue = Number(formState.costPrice)
   const priceValue = Number(formState.price)
@@ -480,6 +481,36 @@ export function ProductsManager({
     }
   }
 
+  const downloadProductsExcel = async () => {
+    setError(null)
+    setIsDownloadingExcel(true)
+
+    try {
+      const response = await fetch("/api/products/catalog/excel")
+      if (!response.ok) {
+        setError("Failed to download products Excel.")
+        return
+      }
+
+      const disposition = response.headers.get("Content-Disposition")
+      const filename =
+        disposition?.match(/filename="([^"]+)"/)?.[1] ?? "products.xlsx"
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError("Failed to download products Excel.")
+    } finally {
+      setIsDownloadingExcel(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -494,6 +525,16 @@ export function ProductsManager({
             <Button variant="outline" onClick={produceCatalogPdf}>
               <FileText className="size-4" />
               Catalog PDF
+            </Button>
+          ) : null}
+          {isAdmin ? (
+            <Button
+              variant="outline"
+              onClick={downloadProductsExcel}
+              disabled={isDownloadingExcel}
+            >
+              <FileSpreadsheet className="size-4" />
+              {isDownloadingExcel ? "Preparing Excel..." : "Products Excel"}
             </Button>
           ) : null}
           {isAdmin ? (

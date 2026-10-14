@@ -104,6 +104,7 @@
 | `lib/db/validators` | Zod schemas for incoming payloads |
 | `lib/db` | Shared DB business helpers such as approval filters, soft-delete filters, alert sync |
 | `lib/pdf` | PDFKit document generation |
+| `lib/excel` | ExcelJS workbook generation for admin exports |
 | `lib/products` | Product serialization and cost-field shaping |
 | `lib/utils` | Formatting, dates, invoice numbers, calculations, API client helpers |
 | `types` | Shared TypeScript types |
@@ -157,6 +158,17 @@ DashboardStats client component
   -> route aggregates products, sales, returns, invoices, expenses
   -> admin-only cost/profit fields included only for admins
   -> component renders cards and tables
+```
+
+### Excel Export
+
+```text
+Admin clicks Excel export
+  -> GET /api/products/catalog/excel or /api/sales/excel?from&to
+  -> route calls requireAdmin()
+  -> shared loader (lib/products/catalog.ts or lib/db/sales-list.ts), same data as the PDF route
+  -> lib/excel/* builds an ExcelJS workbook
+  -> response returns .xlsx with Content-Disposition filename
 ```
 
 ### PDF Export

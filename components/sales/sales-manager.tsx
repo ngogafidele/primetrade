@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { FileText } from "lucide-react"
+import { FileSpreadsheet, FileText } from "lucide-react"
 import { formatCurrency } from "@/lib/utils/format"
 import {
   formatInKigali,
@@ -114,7 +114,7 @@ const defaultOutstandingForm: OutstandingDetails = {
   paymentDate: "",
 }
 
-function getDefaultPdfRange() {
+function getDefaultExportRange() {
   const now = new Date()
   const parts = getKigaliDateParts(now)
   const today = formatKigaliDateInput(now)
@@ -124,10 +124,24 @@ function getDefaultPdfRange() {
   }
 }
 
-function getDownloadFilename(response: Response) {
+type SalesListFormat = "pdf" | "excel"
+
+const salesListDownloads: Record<
+  SalesListFormat,
+  { path: string; fallbackFilename: string; label: string }
+> = {
+  pdf: { path: "/api/sales/pdf", fallbackFilename: "sales-list.pdf", label: "PDF" },
+  excel: {
+    path: "/api/sales/excel",
+    fallbackFilename: "sales-list.xlsx",
+    label: "Excel",
+  },
+}
+
+function getDownloadFilename(response: Response, fallback: string) {
   const disposition = response.headers.get("Content-Disposition")
   const match = disposition?.match(/filename="([^"]+)"/)
-  return match?.[1] ?? "sales-list.pdf"
+  return match?.[1] ?? fallback
 }
 
 export function SalesManager({
@@ -194,8 +208,9 @@ export function SalesManager({
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [invoicedSaleIds, setInvoicedSaleIds] = useState<string[]>([])
   const [saleSearch, setSaleSearch] = useState("")
-  const [pdfRange, setPdfRange] = useState(() => getDefaultPdfRange())
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
+  const [exportRange, setExportRange] = useState(() => getDefaultExportRange())
+  const [downloadingFormat, setDownloadingFormat] =
+    useState<SalesListFormat | null>(null)
 
   const draftTotal = useMemo(() => {
     return draftItems.reduce((sum, item) => {
@@ -980,20 +995,22 @@ export function SalesManager({
     return Number.isFinite(sellingPrice) && sellingPrice < product.costPrice
   }
 
-  const downloadSalesListPdf = async () => {
-    setIsDownloadingPdf(true)
+  const downloadSalesList = async (format: SalesListFormat) => {
+    const download = salesListDownloads[format]
+    const failureMessage = `Failed to download sales list ${download.label}.`
+    setDownloadingFormat(format)
     setError(null)
 
     try {
       const params = new URLSearchParams({
-        from: pdfRange.from,
-        to: pdfRange.to,
+        from: exportRange.from,
+        to: exportRange.to,
       })
-      const response = await fetch(`/api/sales/pdf?${params.toString()}`)
+      const response = await fetch(`${download.path}?${params.toString()}`)
 
       if (!response.ok) {
         const body = await response.json().catch(() => null)
-        setError(body?.error ?? "Failed to download sales list PDF.")
+        setError(body?.error ?? failureMessage)
         return
       }
 
@@ -1001,15 +1018,15 @@ export function SalesManager({
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      link.download = getDownloadFilename(response)
+      link.download = getDownloadFilename(response, download.fallbackFilename)
       document.body.appendChild(link)
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
     } catch {
-      setError("Failed to download sales list PDF.")
+      setError(failureMessage)
     } finally {
-      setIsDownloadingPdf(false)
+      setDownloadingFormat(null)
     }
   }
 
@@ -1034,12 +1051,12 @@ export function SalesManager({
       {canApproveSales ? (
         <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row sm:items-end">
           <label className="grid gap-1 text-sm">
-            PDF From
+            From
             <Input
               type="date"
-              value={pdfRange.from}
+              value={exportRange.from}
               onChange={(event) =>
-                setPdfRange((current) => ({
+                setExportRange((current) => ({
                   ...current,
                   from: event.target.value,
                 }))
@@ -1047,12 +1064,12 @@ export function SalesManager({
             />
           </label>
           <label className="grid gap-1 text-sm">
-            PDF To
+            To
             <Input
               type="date"
-              value={pdfRange.to}
+              value={exportRange.to}
               onChange={(event) =>
-                setPdfRange((current) => ({
+                setExportRange((current) => ({
                   ...current,
                   to: event.target.value,
                 }))
@@ -1062,11 +1079,22 @@ export function SalesManager({
           <Button
             type="button"
             variant="outline"
-            onClick={downloadSalesListPdf}
-            disabled={isDownloadingPdf || !pdfRange.from || !pdfRange.to}
+            onClick={() => downloadSalesList("pdf")}
+            disabled={downloadingFormat !== null || !exportRange.from || !exportRange.to}
           >
             <FileText className="size-4" />
-            {isDownloadingPdf ? "Preparing PDF..." : "Sales List PDF"}
+            {downloadingFormat === "pdf" ? "Preparing PDF..." : "Sales List PDF"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => downloadSalesList("excel")}
+            disabled={downloadingFormat !== null || !exportRange.from || !exportRange.to}
+          >
+            <FileSpreadsheet className="size-4" />
+            {downloadingFormat === "excel"
+              ? "Preparing Excel..."
+              : "Sales List Excel"}
           </Button>
         </section>
       ) : null}
