@@ -23,7 +23,7 @@ type StampDocument = {
 const stampPath = path.join(process.cwd(), "public", "images", "stamp.jpg")
 const stampSize = 96
 const stampGap = 10
-const stampRight = 547
+const stampRight = 467
 const pageTop = 48
 
 let stampBuffer: Buffer | null | undefined

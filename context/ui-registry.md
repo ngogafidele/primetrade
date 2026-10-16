@@ -218,7 +218,7 @@ Files:
 Pattern notes:
 
 PDF and Excel actions should show pending state (`Preparing PDF...` / `Preparing Excel...`), use server routes, read `Content-Disposition` for filenames when needed, and never generate files client-side. Excel buttons use the lucide `FileSpreadsheet` icon; PDF buttons use `FileText`.
-Customer-facing PDFs (sales invoices, proformas, return receipts, loan statements) draw the signed company stamp bottom-right, just above the thank-you bar, via `lib/pdf/stamp.ts` (`getStampedFooterY`, `getStampedPageFooterY`, `drawStamp`) using the downscaled `public/images/stamp.jpg` (JPEG on white, ~39 KB). Internal PDFs (reports, catalog, sales list) are not stamped.
+Customer-facing PDFs (sales invoices, proformas, return receipts, loan statements) draw the signed company stamp bottom-right (right edge at x=467, inset 80pt from the 547 content margin), just above the thank-you bar, via `lib/pdf/stamp.ts` (`getStampedFooterY`, `getStampedPageFooterY`, `drawStamp`) using the downscaled `public/images/stamp.jpg` (JPEG on white, ~39 KB). Internal PDFs (reports, catalog, sales list) are not stamped.
 Loan statement PDFs should render each sale item on its own table row. For multi-item loans, transaction-level details such as number, sale date, payment date, and recorded-by should appear only on the first item row.
 
 ---
