@@ -8,7 +8,7 @@ Update this file after completed features or meaningful architecture changes.
 
 Phase: Production-style operational app with context documentation added.
 
-Last completed: Admin Excel exports for the products list (full catalog) and the sales list (date range).
+Last completed: Admin-managed website categories (Products → Website categories), 2026-11-14. Not yet run against the real database.
 
 Next: No active feature. Future work should start by reading this context folder and `AGENTS.md`.
 
@@ -50,6 +50,11 @@ Next: No active feature. Future work should start by reading this context folder
 - [x] SKU generation avoids reusing soft-deleted product SKUs
 - [x] Product catalog PDF export
 - [x] Products Excel export (admin, full active catalog)
+- [x] Product website profile (admin): show/hide switch, category, brand, description, specifications
+- [x] All active products on the public website by default; admins hide exceptions
+- [x] Admin-managed website categories: add, rename, describe, reorder, delete (`/api/website-categories`)
+- [x] Product image upload to Cloudflare R2 (admin, direct browser upload with signed URLs)
+- [x] Public catalog endpoint for the public website (`GET /api/public/catalog`, token-protected)
 
 ### Sales And Stock
 
@@ -145,6 +150,9 @@ Next: No active feature. Future work should start by reading this context folder
 - Low-stock alerts must be synced after stock-changing operations.
 - PDFs are server-generated with PDFKit.
 - UI should remain compact and operational, using current theme tokens and shared primitives.
+- The public website (primepublic) reads only `GET /api/public/catalog`. That route is the single unauthenticated-by-session data route; it requires `PUBLIC_CATALOG_TOKEN`, returns every active product except those with `website.isHidden: true` (products are public by default since 2026-11-14; the dialog's "Show on website" switch sets `isHidden`; the API payload still calls it `isPublished`), and builds responses through the `toPublicProduct` allow-list. Prices, cost, stock and supplier data must never be added to it without an explicit decision.
+- Website categories are managed by admins (Products → Website categories) and stored in the `WebsiteCategory` collection; `lib/website/category-store.ts` is the only reader. `DEFAULT_WEBSITE_CATEGORIES` in `lib/website/categories.ts` is just the starting list: reads fall back to it while the collection is empty, and the admin routes copy it into the database on first use. A category's slug is fixed at creation (renames keep web addresses), deleting one clears `website.category` on its products, and the last category cannot be deleted. The old `Category` collection is still unused. A category is optional.
+- Product images are stored in R2 by key (`products/<productId>/<uuid>.<ext>`); public URLs are built from `R2_PUBLIC_BASE_URL`. Soft-deleting a product keeps its images; removing an image deletes the R2 object.
 
 ---
 
@@ -158,6 +166,8 @@ Next: No active feature. Future work should start by reading this context folder
 ---
 
 ## Verification Notes
+
+Website profile and image upload work (2026-11-13): `npm run build` completed successfully and ESLint is clean on the new files. Signed upload URL generation, the public product mapper (no price/cost/stock fields) and the validators were checked in isolation with sample data. The new routes and the Website dialog were not exercised against the database or a real R2 bucket; no local MongoDB or R2 credentials were available.
 
 Multi-item loan statement rows were refined so item lines remain separate while shared transaction details print only on the first item row. Full `npm.cmd run lint` and focused ESLint previously did not complete within the command timeout; `npx.cmd tsc --noEmit --pretty false` still reports pre-existing unrelated project type errors.
 

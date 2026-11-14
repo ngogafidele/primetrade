@@ -101,6 +101,54 @@ Pattern notes:
 
 Product manager handles active and deleted product lists, create/edit, restock, pagination, and warnings when admin sees price below cost.
 
+Admin rows also have a `Website` outline button (`Globe`) that opens the Product Website Dialog, and every row shows its website status under the name: `On website` (the default) as `rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary`, or `Hidden from website` as `rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground`. Badges are `shrink-0 whitespace-nowrap`.
+
+Long product names wrap instead of widening the table: the name cell overrides the table's `whitespace-nowrap` with `whitespace-normal`, and its content is a `flex min-w-32 max-w-56 flex-col items-start gap-1` stack (name with `wrap-break-word`, badge below). The deleted-products table caps names at `max-w-72`. Row actions are one non-wrapping `flex justify-end gap-1.5` line so rows keep the same height; the "Low Stock Threshold" header wraps (`w-24 whitespace-normal leading-tight`) to save width. If the table is still wider than the screen, it scrolls sideways inside its container.
+
+---
+
+## Website Categories Dialog
+
+File: `components/products/website-categories-dialog.tsx`
+
+Opened by the admin-only outline `Website categories` button (`Tags`) in the products page header. Mounted only while open.
+
+| Property | Pattern |
+| --- | --- |
+| Size | `DialogContent` with `max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl` |
+| Category row | `rounded-xl border border-border/80 p-2.5`: name (`text-sm font-medium`), product-count chip (`rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground`), description (`text-xs text-muted-foreground`) |
+| Row actions | `ghost` `icon-sm` buttons: move up, move down, edit (`Pencil`), delete (`Trash2` in `text-destructive`) |
+| Inline edit | The row turns into Name and Description `Input`s with `sm` Cancel / Save buttons |
+| Add form | `rounded-xl border border-border/80 bg-muted/40 p-3` section; `sm:grid-cols-[1fr_1.4fr_auto]` with Name, Description and a default `Add` button (`Plus`) |
+| Save model | Every change saves immediately, then the list reloads; all controls disable while a request runs |
+| Errors | Compact `text-sm text-destructive` line above the footer |
+| Footer | Single outline `Close` button |
+
+Pattern notes:
+
+Delete asks with `window.confirm` and says how many products will lose the category. Delete is disabled on the last remaining category.
+
+---
+
+## Product Website Dialog
+
+File: `components/products/product-website-dialog.tsx`
+
+| Property | Pattern |
+| --- | --- |
+| State owner | Client dialog, remounted per product via `key`; loads from `GET /api/products/[id]/website` on open |
+| Size | `DialogContent` with `max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl` |
+| Show on website switch | Native checkbox (`accent-primary`) inside a `rounded-xl border border-border/80 bg-muted/40 p-3` label; checked by default, unchecking hides the product |
+| Fields | `Input` for brand/spec rows/image descriptions; native `select` and `textarea` sharing the input token classes |
+| Images | List rows with a `size-16` thumbnail, description input, and `ghost` `icon-sm` buttons for move up, move down, remove |
+| Upload | Outline `Upload images` button (`ImagePlus`); files are resized in the browser to 1600px WebP, then sent to R2 with a signed URL |
+| Save model | Image add/remove saves immediately; everything else saves with `Save changes` |
+| Errors | Compact `text-sm text-destructive` line above the footer |
+
+Pattern notes:
+
+Uploads are disabled with a muted notice when R2 is not configured. The website category is optional; a product without one appears only under "All" on the website. The dialog never shows or edits price, cost or stock.
+
 ---
 
 ## Sales Manager

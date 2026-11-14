@@ -9,6 +9,7 @@ export type ProductSerializable = {
   lowStockThreshold?: number
   costPrice?: number
   price: number
+  website?: { isHidden?: boolean } | null
   supplierName?: string
   lastRestockAt?: DateLike
   createdAt?: DateLike
@@ -54,6 +55,7 @@ export function serializeProduct(
     quantity: product.quantity,
     lowStockThreshold: product.lowStockThreshold ?? 0,
     price: product.price,
+    websitePublished: !product.website?.isHidden,
     supplierName: product.supplierName ?? "",
     lastRestockAt: serializeDate(product.lastRestockAt),
     createdAt: serializeDate(product.createdAt),

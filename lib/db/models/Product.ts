@@ -1,5 +1,36 @@
 import mongoose, { Schema } from "mongoose"
 
+const ProductImageSchema = new Schema({
+  // Object key in the R2 bucket; the public URL is built from R2_PUBLIC_BASE_URL.
+  key: { type: String, required: true },
+  width: { type: Number, required: true, min: 1 },
+  height: { type: Number, required: true, min: 1 },
+  alt: { type: String, trim: true, default: "" },
+})
+
+const ProductSpecSchema = new Schema(
+  {
+    label: { type: String, required: true, trim: true },
+    value: { type: String, required: true, trim: true },
+  },
+  { _id: false }
+)
+
+// What the public website may show for this product. Every active product is
+// on the website unless an admin hides it (isHidden). Prices, cost and stock
+// are never part of this.
+const ProductWebsiteSchema = new Schema(
+  {
+    isHidden: { type: Boolean, default: false },
+    category: { type: String, trim: true, default: "" },
+    brand: { type: String, trim: true, default: "" },
+    description: { type: String, trim: true, default: "" },
+    specs: { type: [ProductSpecSchema], default: [] },
+    images: { type: [ProductImageSchema], default: [] },
+  },
+  { _id: false }
+)
+
 const ProductSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -13,6 +44,7 @@ const ProductSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Category",
     },
+    website: { type: ProductWebsiteSchema, default: () => ({}) },
     deletedAt: { type: Date, default: null },
     deletedBy: {
       type: Schema.Types.ObjectId,
@@ -31,6 +63,7 @@ ProductSchema.index(
   }
 )
 ProductSchema.index({ deletedAt: 1 })
+ProductSchema.index({ "website.isHidden": 1 })
 ProductSchema.index(
   { name: 1 },
   {

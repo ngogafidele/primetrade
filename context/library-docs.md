@@ -226,6 +226,33 @@ Rules:
 
 ---
 
+## aws4fetch / Cloudflare R2
+
+Version: `^1.0.20`
+
+Product images are stored in a Cloudflare R2 bucket. R2 speaks the S3 protocol; `aws4fetch` signs the requests. All access goes through `lib/storage/r2.ts`.
+
+Environment:
+
+```text
+R2_ACCOUNT_ID
+R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY
+R2_BUCKET
+R2_PUBLIC_BASE_URL
+```
+
+Rules:
+
+- Never send image bytes through this app. The browser uploads to a signed URL from `createUploadUrl`.
+- The server names every object; never use an uploaded filename as a key.
+- Confirm an upload with `getObjectInfo` (size and type) before recording it on a product.
+- Store the object key on the product, not the full URL.
+- Check `isStorageConfigured()` and return 503 when R2 is not set up.
+- The bucket needs a CORS rule allowing `PUT` with `Content-Type` from this app's origin.
+
+---
+
 ## ExcelJS
 
 Library: `exceljs` 4.x. Listed in `serverExternalPackages` in `next.config.ts` alongside `pdfkit`.

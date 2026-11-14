@@ -299,7 +299,11 @@ Restock/supply history for product, supplier, quantity, unit cost, supplied date
 
 ### Category
 
-Simple name and description catalog.
+Simple name and description catalog. Not used by any page or route.
+
+### WebsiteCategory
+
+Categories shown on the public website: unique `slug` (fixed at creation), `name`, `description`, `order`. Managed by admins through `/api/website-categories`; read through `lib/website/category-store.ts`. Products reference a category by slug in `website.category`.
 
 ### Sale
 

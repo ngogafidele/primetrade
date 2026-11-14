@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { formatCurrency } from "@/lib/utils/format"
-import { FileSpreadsheet, FileText, PackagePlus, Plus, Trash2 } from "lucide-react"
+import { FileSpreadsheet, FileText, Globe, PackagePlus, Plus, Tags, Trash2 } from "lucide-react"
+import { ProductWebsiteDialog } from "@/components/products/product-website-dialog"
+import { WebsiteCategoriesDialog } from "@/components/products/website-categories-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -33,6 +35,7 @@ type ProductClient = {
   lowStockThreshold: number
   costPrice?: number
   price: number
+  websitePublished?: boolean
   supplierName?: string
   lastRestockAt?: string
   deletedAt?: string
@@ -127,6 +130,8 @@ export function ProductsManager({
   const [activeProductId, setActiveProductId] = useState<string | null>(null)
   const [activeSupplyProduct, setActiveSupplyProduct] =
     useState<ProductClient | null>(null)
+  const [websiteProduct, setWebsiteProduct] = useState<ProductClient | null>(null)
+  const [categoriesOpen, setCategoriesOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [supplyDialogOpen, setSupplyDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -535,6 +540,12 @@ export function ProductsManager({
             >
               <FileSpreadsheet className="size-4" />
               {isDownloadingExcel ? "Preparing Excel..." : "Products Excel"}
+            </Button>
+          ) : null}
+          {isAdmin ? (
+            <Button variant="outline" onClick={() => setCategoriesOpen(true)}>
+              <Tags className="size-4" />
+              Website categories
             </Button>
           ) : null}
           {isAdmin ? (
@@ -955,7 +966,9 @@ export function ProductsManager({
             <TableHead>Recorded</TableHead>
             <TableHead>Last Restock</TableHead>
             <TableHead>Supplier</TableHead>
-            <TableHead>Low Stock Threshold</TableHead>
+            <TableHead className="w-24 whitespace-normal leading-tight">
+              Low Stock Threshold
+            </TableHead>
             {isAdmin ? <TableHead>Cost Price</TableHead> : null}
             <TableHead>Selling Price</TableHead>
             {isAdmin ? <TableHead className="text-right">Actions</TableHead> : null}
@@ -983,7 +996,22 @@ export function ProductsManager({
                       : undefined
                 }
               >
-                <TableCell>{product.name}</TableCell>
+                <TableCell className="whitespace-normal">
+                  {/* Name above its website badge; long names wrap inside a capped width
+                      so the other columns stay in view. */}
+                  <div className="flex min-w-32 max-w-56 flex-col items-start gap-1">
+                    <span className="wrap-break-word">{product.name}</span>
+                    {product.websitePublished === false ? (
+                      <span className="shrink-0 whitespace-nowrap rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        Hidden from website
+                      </span>
+                    ) : (
+                      <span className="shrink-0 whitespace-nowrap rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        On website
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>{product.sku}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -1022,7 +1050,8 @@ export function ProductsManager({
                 </TableCell>
                 {isAdmin ? (
                   <TableCell className="text-right">
-                    <div className="flex flex-wrap justify-end gap-2">
+                    {/* One line of actions keeps every row the same height. */}
+                    <div className="flex justify-end gap-1.5">
                       <Button
                         size="sm"
                         variant="outline"
@@ -1030,6 +1059,14 @@ export function ProductsManager({
                       >
                         <PackagePlus className="size-3.5" />
                         Receive
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setWebsiteProduct(product)}
+                      >
+                        <Globe className="size-3.5" />
+                        Website
                       </Button>
                       <Button
                         size="sm"
@@ -1085,6 +1122,25 @@ export function ProductsManager({
           </Button>
         </div>
       </div>
+      {isAdmin && categoriesOpen ? (
+        <WebsiteCategoriesDialog onClose={() => setCategoriesOpen(false)} />
+      ) : null}
+      {isAdmin ? (
+        <ProductWebsiteDialog
+          key={websiteProduct?._id ?? "closed"}
+          product={websiteProduct}
+          onClose={() => setWebsiteProduct(null)}
+          onPublishedChange={(productId, isPublished) =>
+            setProducts((prev) =>
+              prev.map((item) =>
+                item._id === productId
+                  ? { ...item, websitePublished: isPublished }
+                  : item
+              )
+            )
+          }
+        />
+      ) : null}
       {isAdmin ? (
         <section className="space-y-3 border-t border-border/80 pt-5">
           <div>
@@ -1119,7 +1175,9 @@ export function ProductsManager({
                     <TableCell>
                       {product.deletedAtLabel ?? formatProductDate(product.deletedAt)}
                     </TableCell>
-                    <TableCell>{product.name}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      <div className="max-w-72 min-w-40 wrap-break-word">{product.name}</div>
+                    </TableCell>
                     <TableCell>{product.sku}</TableCell>
                     <TableCell>{product.quantity}</TableCell>
                     <TableCell>{product.unit ?? "pcs"}</TableCell>

@@ -23,6 +23,7 @@ type ProductsPageProduct = {
   lowStockThreshold?: number
   costPrice: number
   price: number
+  website?: { isHidden?: boolean }
   deletedAt?: Date
   deletedBy?: PopulatedProductUser | { toString(): string }
   deletedReason?: string
