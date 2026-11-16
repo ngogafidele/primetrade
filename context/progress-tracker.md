@@ -55,6 +55,7 @@ Next: No active feature. Future work should start by reading this context folder
 - [x] Admin-managed website categories: add, rename, describe, reorder, delete (`/api/website-categories`)
 - [x] Product image upload to Cloudflare R2 (admin, direct browser upload with signed URLs)
 - [x] Public catalog endpoint for the public website (`GET /api/public/catalog`, token-protected)
+- [x] Popularity rank in the public catalog (`popularityRank`, from approved sales in the last 12 months), 2026-11-16. Not yet run against the real database.
 
 ### Sales And Stock
 
@@ -150,7 +151,7 @@ Next: No active feature. Future work should start by reading this context folder
 - Low-stock alerts must be synced after stock-changing operations.
 - PDFs are server-generated with PDFKit.
 - UI should remain compact and operational, using current theme tokens and shared primitives.
-- The public website (primepublic) reads only `GET /api/public/catalog`. That route is the single unauthenticated-by-session data route; it requires `PUBLIC_CATALOG_TOKEN`, returns every active product except those with `website.isHidden: true` (products are public by default since 2026-11-14; the dialog's "Show on website" switch sets `isHidden`; the API payload still calls it `isPublished`), and builds responses through the `toPublicProduct` allow-list. Prices, cost, stock and supplier data must never be added to it without an explicit decision.
+- The public website (primepublic) reads only `GET /api/public/catalog`. That route is the single unauthenticated-by-session data route; it requires `PUBLIC_CATALOG_TOKEN`, returns every active product except those with `website.isHidden: true` (products are public by default since 2026-11-14; the dialog's "Show on website" switch sets `isHidden`; the API payload still calls it `isPublished`), and builds responses through the `toPublicProduct` allow-list. Prices, cost, stock and supplier data must never be added to it without an explicit decision. Approved on 2026-11-16: each product also carries a `popularityRank` (1 = most sold) built by `lib/website/popularity.ts` from the number of approved sales the product appeared in over the last 12 months (`approvedSaleDateFilter`; one per sale, quantities ignored; ties broken by name; ranked only among products the website shows; no rank without sales). Only the rank leaves the app, never sale counts, quantities or amounts.
 - Website categories are managed by admins (Products → Website categories) and stored in the `WebsiteCategory` collection; `lib/website/category-store.ts` is the only reader. `DEFAULT_WEBSITE_CATEGORIES` in `lib/website/categories.ts` is just the starting list: reads fall back to it while the collection is empty, and the admin routes copy it into the database on first use. A category's slug is fixed at creation (renames keep web addresses), deleting one clears `website.category` on its products, and the last category cannot be deleted. The old `Category` collection is still unused. A category is optional.
 - Product images are stored in R2 by key (`products/<productId>/<uuid>.<ext>`); public URLs are built from `R2_PUBLIC_BASE_URL`. Soft-deleting a product keeps its images; removing an image deletes the R2 object.
 
